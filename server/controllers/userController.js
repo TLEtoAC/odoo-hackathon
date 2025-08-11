@@ -1,254 +1,115 @@
-const { User } = require('../modules');
+const pool = require('../dbPool');
+const bcrypt = require('bcryptjs');
 const { validationResult } = require('express-validator');
 
 // User registration
 const register = async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
-    }
-
+    console.log('Registration request received:', req.body);
+    
     const { username, email, password, firstName, lastName } = req.body;
-
-    // Check if user already exists
-    const existingUser = await User.findOne({
-      where: {
-        [require('sequelize').Op.or]: [{ email }, { username }]
-      }
-    });
-
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: existingUser.email === email 
-          ? 'Email already registered' 
-          : 'Username already taken'
-      });
+    
+    if (!username || !email || !password || !firstName || !lastName) {
+      return res.status(400).json({ success: false, message: 'All fields are required' });
     }
 
-    // Create new user
-    const user = await User.create({
-      username,
-      email,
-      password,
-      firstName,
-      lastName
-    });
+    // Check duplicates
+    const dup = await pool.query('SELECT 1 FROM users WHERE email=$1 OR username=$2 LIMIT 1', [email, username]);
+    if (dup.rowCount > 0) {
+      return res.status(400).json({ success: false, message: 'Email or username already exists' });
+    }
 
-    res.status(201).json({
-      success: true,
-      message: 'User registered successfully',
-      data: {
-        user: user.getPublicProfile()
+    const hashed = await bcrypt.hash(password, 12);
+    const insert = await pool.query(
+      `INSERT INTO users (username, email, password, first_name, last_name) VALUES ($1,$2,$3,$4,$5) RETURNING id, username, email, first_name AS "firstName", last_name AS "lastName", is_active AS "isActive"`,
+      [username, email, hashed, firstName, lastName]
+    );
+
+    const user = insert.rows[0];
+
+    // Create session
+    req.login(user, (err) => {
+      if (err) {
+        console.error('Session creation error:', err);
+        return res.status(500).json({ success: false, message: 'Session creation failed' });
       }
+      res.status(201).json({ success: true, message: 'User registered successfully', data: { user } });
     });
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    res.status(500).json({ success: false, message: 'Internal server error', error: error.message });
   }
 };
 
-// User login - This will be handled by Passport middleware
+// Login via Passport local already handles compare; but keep API fallback
 const login = async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
-    }
+    const { email, password } = req.body;
+    const found = await pool.query('SELECT * FROM users WHERE email=$1 LIMIT 1', [email]);
+    if (found.rowCount === 0) return res.status(400).json({ success: false, message: 'Invalid credentials' });
+    const user = found.rows[0];
+    const ok = await bcrypt.compare(password, user.password);
+    if (!ok) return res.status(400).json({ success: false, message: 'Invalid credentials' });
 
-    // Passport authentication will be handled by middleware
-    // If we reach here, authentication was successful
-    res.json({
-      success: true,
-      message: 'Login successful',
-      data: {
-        user: req.user.getPublicProfile()
-      }
-    });
+    const publicUser = { id: user.id, username: user.username, email: user.email, firstName: user.first_name, lastName: user.last_name, isActive: user.is_active };
+
+    await new Promise((resolve, reject) => { req.login(publicUser, (err) => (err ? reject(err) : resolve())); });
+
+    res.json({ success: true, message: 'Login successful', data: { user: publicUser } });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
 
-// Get user profile
 const getProfile = async (req, res) => {
   try {
-    const user = await User.findByPk(req.user.id);
-    
-    res.json({
-      success: true,
-      data: {
-        user: user.getPublicProfile()
-      }
-    });
+    const r = await pool.query('SELECT id, username, email, first_name AS "firstName", last_name AS "lastName", is_active AS "isActive" FROM users WHERE id=$1', [req.user.id]);
+    res.json({ success: true, data: { user: r.rows[0] } });
   } catch (error) {
-    console.error('Get profile error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
 
-// Update user profile
 const updateProfile = async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
-    }
-
-    const { firstName, lastName, bio, preferences } = req.body;
-    const updateData = {};
-
-    if (firstName) updateData.firstName = firstName;
-    if (lastName) updateData.lastName = lastName;
-    if (bio !== undefined) updateData.bio = bio;
-    if (preferences) updateData.preferences = { ...req.user.preferences, ...preferences };
-
-    const user = await User.findByPk(req.user.id);
-    await user.update(updateData);
-
-    res.json({
-      success: true,
-      message: 'Profile updated successfully',
-      data: {
-        user: user.getPublicProfile()
-      }
-    });
+    const { firstName, lastName, bio } = req.body;
+    const r = await pool.query('UPDATE users SET first_name=$1, last_name=$2, bio=$3, updated_at=NOW() WHERE id=$4 RETURNING id, username, email, first_name AS "firstName", last_name AS "lastName", is_active AS "isActive"', [firstName, lastName, bio || null, req.user.id]);
+    res.json({ success: true, message: 'Profile updated successfully', data: { user: r.rows[0] } });
   } catch (error) {
-    console.error('Update profile error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
 
-// Change password
 const changePassword = async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
-    }
-
     const { currentPassword, newPassword } = req.body;
-
-    const user = await User.findByPk(req.user.id);
-    
-    // Verify current password
-    const isCurrentPasswordValid = await user.comparePassword(currentPassword);
-    if (!isCurrentPasswordValid) {
-      return res.status(400).json({
-        success: false,
-        message: 'Current password is incorrect'
-      });
-    }
-
-    // Update password
-    await user.update({ password: newPassword });
-
-    res.json({
-      success: true,
-      message: 'Password changed successfully'
-    });
+    const found = await pool.query('SELECT id,password FROM users WHERE id=$1', [req.user.id]);
+    const ok = await bcrypt.compare(currentPassword, found.rows[0].password);
+    if (!ok) return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+    const hashed = await bcrypt.hash(newPassword, 12);
+    await pool.query('UPDATE users SET password=$1, updated_at=NOW() WHERE id=$2', [hashed, req.user.id]);
+    res.json({ success: true, message: 'Password changed successfully' });
   } catch (error) {
-    console.error('Change password error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
 
-// Logout user
 const logout = async (req, res) => {
-  try {
-    req.logout((err) => {
-      if (err) {
-        return res.status(500).json({
-          success: false,
-          message: 'Error during logout'
-        });
-      }
-      
-      res.json({
-        success: true,
-        message: 'Logout successful'
-      });
-    });
-  } catch (error) {
-    console.error('Logout error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
-  }
+  try { req.logout(() => res.json({ success: true, message: 'Logout successful' })); } catch { res.status(500).json({ success: false, message: 'Internal server error' }); }
 };
 
-// Delete account
 const deleteAccount = async (req, res) => {
   try {
     const { password } = req.body;
-
-    const user = await User.findByPk(req.user.id);
-    
-    // Verify password
-    const isPasswordValid = await user.comparePassword(password);
-    if (!isPasswordValid) {
-      return res.status(400).json({
-        success: false,
-        message: 'Password is incorrect'
-      });
-    }
-
-    // Deactivate account
-    await user.update({ isActive: false });
-
-    res.json({
-      success: true,
-      message: 'Account deactivated successfully'
-    });
+    const found = await pool.query('SELECT password FROM users WHERE id=$1', [req.user.id]);
+    const ok = await bcrypt.compare(password, found.rows[0].password);
+    if (!ok) return res.status(400).json({ success: false, message: 'Password is incorrect' });
+    await pool.query('UPDATE users SET is_active=false, updated_at=NOW() WHERE id=$1', [req.user.id]);
+    res.json({ success: true, message: 'Account deactivated successfully' });
   } catch (error) {
-    console.error('Delete account error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
 
-module.exports = {
-  register,
-  login,
-  logout,
-  getProfile,
-  updateProfile,
-  changePassword,
-  deleteAccount
-};
+module.exports = { register, login, logout, getProfile, updateProfile, changePassword, deleteAccount };

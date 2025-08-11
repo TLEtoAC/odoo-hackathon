@@ -1,101 +1,137 @@
-const { Activity, City } = require('../modules');
-const { Op } = require('sequelize');
-const { validationResult } = require('express-validator');
+const pool = require('../dbPool');
+const { validationResult } = require("express-validator");
+
+// Helper: format activity
+const getSummary = (activity) => ({
+  id: activity.id,
+  name: activity.name,
+  description: activity.description,
+  type: activity.type,
+  category: activity.category,
+  duration: activity.duration,
+  cost: activity.cost,
+  currency: activity.currency,
+  costType: activity.cost_type,
+  location: activity.location,
+  latitude: activity.latitude,
+  longitude: activity.longitude,
+  difficulty: activity.difficulty,
+  ageRestriction: activity.age_restriction,
+  tips: activity.tips,
+  rating: activity.rating,
+  reviewCount: activity.review_count,
+  cityId: activity.city_id,
+});
 
 // Search activities
 const searchActivities = async (req, res) => {
   try {
-    const { 
-      q = '', 
-      type, 
-      category, 
+    const {
+      q = "",
+      type,
+      category,
       cityId,
       minCost = 0,
       maxCost,
       minDuration = 0,
       maxDuration,
       difficulty,
-      page = 1, 
+      page = 1,
       limit = 20,
-      sortBy = 'rating',
-      sortOrder = 'DESC'
+      sortBy = "rating",
+      sortOrder = "DESC",
     } = req.query;
 
     const offset = (page - 1) * limit;
-    const whereClause = { isActive: true };
+    const values = [];
+    let whereClauses = ["a.is_active = true"];
 
-    // Search query
     if (q) {
-      whereClause[Op.or] = [
-        { name: { [Op.like]: `%${q}%` } },
-        { description: { [Op.like]: `%${q}%` } },
-        { category: { [Op.like]: `%${q}%` } }
-      ];
+      values.push(`%${q}%`);
+      values.push(`%${q}%`);
+      values.push(`%${q}%`);
+      whereClauses.push(
+        `(a.name ILIKE $${values.length - 2} OR a.description ILIKE $${
+          values.length - 1
+        } OR a.category ILIKE $${values.length})`
+      );
     }
 
-    // Filter by type
     if (type) {
-      whereClause.type = type;
+      values.push(type);
+      whereClauses.push(`a.type = $${values.length}`);
     }
 
-    // Filter by category
     if (category) {
-      whereClause.category = category;
+      values.push(category);
+      whereClauses.push(`a.category = $${values.length}`);
     }
 
-    // Filter by city
     if (cityId) {
-      whereClause.cityId = cityId;
+      values.push(cityId);
+      whereClauses.push(`a.city_id = $${values.length}`);
     }
 
-    // Filter by cost range
     if (maxCost) {
-      whereClause.cost = {
-        [Op.between]: [parseFloat(minCost), parseFloat(maxCost)]
-      };
+      values.push(parseFloat(minCost));
+      values.push(parseFloat(maxCost));
+      whereClauses.push(
+        `a.cost BETWEEN $${values.length - 1} AND $${values.length}`
+      );
     } else if (minCost > 0) {
-      whereClause.cost = {
-        [Op.gte]: parseFloat(minCost)
-      };
+      values.push(parseFloat(minCost));
+      whereClauses.push(`a.cost >= $${values.length}`);
     }
 
-    // Filter by duration range
     if (maxDuration) {
-      whereClause.duration = {
-        [Op.between]: [parseInt(minDuration), parseInt(maxDuration)]
-      };
+      values.push(parseInt(minDuration));
+      values.push(parseInt(maxDuration));
+      whereClauses.push(
+        `a.duration BETWEEN $${values.length - 1} AND $${values.length}`
+      );
     } else if (minDuration > 0) {
-      whereClause.duration = {
-        [Op.gte]: parseInt(minDuration)
-      };
+      values.push(parseInt(minDuration));
+      whereClauses.push(`a.duration >= $${values.length}`);
     }
 
-    // Filter by difficulty
     if (difficulty) {
-      whereClause.difficulty = difficulty;
+      values.push(difficulty);
+      whereClauses.push(`a.difficulty = $${values.length}`);
     }
 
-    // Sorting
-    const orderClause = [[sortBy, sortOrder.toUpperCase()]];
-    if (sortBy === 'name') {
-      orderClause.push(['rating', 'DESC']);
-    }
+    const orderCol = [
+      "name",
+      "rating",
+      "cost",
+      "duration",
+      "review_count",
+    ].includes(sortBy)
+      ? sortBy
+      : "rating";
+    const orderDir = sortOrder.toUpperCase() === "ASC" ? "ASC" : "DESC";
 
-    const { count, rows: activities } = await Activity.findAndCountAll({
-      where: whereClause,
-      include: [
-        {
-          model: City,
-          as: 'city',
-          attributes: ['id', 'name', 'country', 'countryCode']
-        }
-      ],
-      order: orderClause,
-      limit: parseInt(limit),
-      offset: parseInt(offset)
-    });
+    // Count query
+    const countQuery = `
+      SELECT COUNT(*) 
+      FROM activities a
+      WHERE ${whereClauses.join(" AND ")}
+    `;
+    const countResult = await pool.query(countQuery, values);
+    const totalItems = parseInt(countResult.rows[0].count);
 
-    const formattedActivities = activities.map(activity => activity.getSummary());
+    // Main query
+    const dataQuery = `
+      SELECT a.*, c.id as city_id, c.name as city_name, c.country, c.country_code
+      FROM activities a
+      JOIN cities c ON a.city_id = c.id
+      WHERE ${whereClauses.join(" AND ")}
+      ORDER BY ${orderCol} ${orderDir}
+      LIMIT $${values.length + 1} OFFSET $${values.length + 2}
+    `;
+    const dataValues = [...values, parseInt(limit), parseInt(offset)];
+    const activitiesResult = await pool.query(dataQuery, dataValues);
+
+    const formattedActivities = activitiesResult.rows.map(getSummary);
 
     res.json({
       success: true,
@@ -103,18 +139,15 @@ const searchActivities = async (req, res) => {
         activities: formattedActivities,
         pagination: {
           currentPage: parseInt(page),
-          totalPages: Math.ceil(count / limit),
-          totalItems: count,
-          itemsPerPage: parseInt(limit)
-        }
-      }
+          totalPages: Math.ceil(totalItems / limit),
+          totalItems,
+          itemsPerPage: parseInt(limit),
+        },
+      },
     });
   } catch (error) {
-    console.error('Search activities error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    console.error("Search activities error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
@@ -122,40 +155,33 @@ const searchActivities = async (req, res) => {
 const getActivityById = async (req, res) => {
   try {
     const { activityId } = req.params;
+    const query = `
+      SELECT a.*, c.id as city_id, c.name as city_name, c.country, c.country_code, c.region
+      FROM activities a
+      JOIN cities c ON a.city_id = c.id
+      WHERE a.id = $1 AND a.is_active = true
+    `;
+    const result = await pool.query(query, [activityId]);
 
-    const activity = await Activity.findOne({
-      where: { id: activityId, isActive: true },
-      include: [
-        {
-          model: City,
-          as: 'city',
-          attributes: ['id', 'name', 'country', 'countryCode', 'region']
-        }
-      ]
-    });
-
-    if (!activity) {
-      return res.status(404).json({
-        success: false,
-        message: 'Activity not found'
-      });
+    if (result.rowCount === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Activity not found" });
     }
 
-    const activityData = activity.getSummary();
-    activityData.city = activity.city;
+    const activityData = getSummary(result.rows[0]);
+    activityData.city = {
+      id: result.rows[0].city_id,
+      name: result.rows[0].city_name,
+      country: result.rows[0].country,
+      countryCode: result.rows[0].country_code,
+      region: result.rows[0].region,
+    };
 
-    res.json({
-      success: true,
-      data: {
-        activity: activityData
-      }
-    });
+    res.json({ success: true, data: { activity: activityData } });
   } catch (error) {
-    console.error('Get activity error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    console.error("Get activity error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
@@ -163,73 +189,52 @@ const getActivityById = async (req, res) => {
 const getActivitiesByType = async (req, res) => {
   try {
     const { type, cityId, limit = 10 } = req.query;
-
-    const whereClause = { 
-      isActive: true,
-      type: type 
-    };
+    const values = [type];
+    let where = `a.is_active = true AND a.type = $1`;
 
     if (cityId) {
-      whereClause.cityId = cityId;
+      values.push(cityId);
+      where += ` AND a.city_id = $${values.length}`;
     }
 
-    const activities = await Activity.findAll({
-      where: whereClause,
-      order: [['rating', 'DESC']],
-      limit: parseInt(limit),
-      include: [
-        {
-          model: City,
-          as: 'city',
-          attributes: ['id', 'name', 'country']
-        }
-      ]
-    });
+    const query = `
+      SELECT a.*, c.id as city_id, c.name as city_name, c.country
+      FROM activities a
+      JOIN cities c ON a.city_id = c.id
+      WHERE ${where}
+      ORDER BY a.rating DESC
+      LIMIT $${values.length + 1}
+    `;
+    values.push(parseInt(limit));
 
-    const formattedActivities = activities.map(activity => activity.getSummary());
+    const result = await pool.query(query, values);
+    const formattedActivities = result.rows.map(getSummary);
 
-    res.json({
-      success: true,
-      data: {
-        activities: formattedActivities
-      }
-    });
+    res.json({ success: true, data: { activities: formattedActivities } });
   } catch (error) {
-    console.error('Get activities by type error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    console.error("Get activities by type error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
 // Get activity types
-const getActivityTypes = async (req, res) => {
+const getActivityTypes = (req, res) => {
   try {
     const types = [
-      'sightseeing',
-      'food',
-      'adventure',
-      'culture',
-      'shopping',
-      'entertainment',
-      'relaxation',
-      'transport',
-      'other'
+      "sightseeing",
+      "food",
+      "adventure",
+      "culture",
+      "shopping",
+      "entertainment",
+      "relaxation",
+      "transport",
+      "other",
     ];
-
-    res.json({
-      success: true,
-      data: {
-        types
-      }
-    });
+    res.json({ success: true, data: { types } });
   } catch (error) {
-    console.error('Get activity types error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    console.error("Get activity types error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
@@ -237,52 +242,46 @@ const getActivityTypes = async (req, res) => {
 const getPopularActivities = async (req, res) => {
   try {
     const { cityId, limit = 10 } = req.query;
+    const values = [];
+    let where = `a.is_active = true`;
 
-    const whereClause = { isActive: true };
     if (cityId) {
-      whereClause.cityId = cityId;
+      values.push(cityId);
+      where += ` AND a.city_id = $${values.length}`;
     }
 
-    const activities = await Activity.findAll({
-      where: whereClause,
-      order: [['rating', 'DESC'], ['reviewCount', 'DESC']],
-      limit: parseInt(limit),
-      include: [
-        {
-          model: City,
-          as: 'city',
-          attributes: ['id', 'name', 'country']
-        }
-      ]
-    });
+    const query = `
+      SELECT a.*, c.id as city_id, c.name as city_name, c.country
+      FROM activities a
+      JOIN cities c ON a.city_id = c.id
+      WHERE ${where}
+      ORDER BY a.rating DESC, a.review_count DESC
+      LIMIT $${values.length + 1}
+    `;
+    values.push(parseInt(limit));
 
-    const formattedActivities = activities.map(activity => activity.getSummary());
+    const result = await pool.query(query, values);
+    const formattedActivities = result.rows.map(getSummary);
 
-    res.json({
-      success: true,
-      data: {
-        activities: formattedActivities
-      }
-    });
+    res.json({ success: true, data: { activities: formattedActivities } });
   } catch (error) {
-    console.error('Get popular activities error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    console.error("Get popular activities error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
-// Create new activity (Admin only)
+// Create activity
 const createActivity = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Validation failed",
+          errors: errors.array(),
+        });
     }
 
     const {
@@ -300,10 +299,17 @@ const createActivity = async (req, res) => {
       difficulty,
       ageRestriction,
       tips,
-      cityId
+      cityId,
     } = req.body;
 
-    const activity = await Activity.create({
+    const query = `
+      INSERT INTO activities
+      (name, description, type, category, duration, cost, currency, cost_type, location, latitude, longitude,
+       difficulty, age_restriction, tips, city_id, is_active)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,true)
+      RETURNING *
+    `;
+    const values = [
       name,
       description,
       type,
@@ -318,90 +324,96 @@ const createActivity = async (req, res) => {
       difficulty,
       ageRestriction,
       tips,
-      cityId
-    });
+      cityId,
+    ];
 
-    res.status(201).json({
-      success: true,
-      message: 'Activity created successfully',
-      data: {
-        activity: activity.getSummary()
-      }
-    });
+    const result = await pool.query(query, values);
+    res
+      .status(201)
+      .json({
+        success: true,
+        message: "Activity created successfully",
+        data: { activity: getSummary(result.rows[0]) },
+      });
   } catch (error) {
-    console.error('Create activity error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    console.error("Create activity error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
-// Update activity (Admin only)
+// Update activity
 const updateActivity = async (req, res) => {
   try {
     const { activityId } = req.params;
     const errors = validationResult(req);
-    
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Validation failed",
+          errors: errors.array(),
+        });
     }
 
-    const activity = await Activity.findByPk(activityId);
-    if (!activity) {
-      return res.status(404).json({
-        success: false,
-        message: 'Activity not found'
-      });
+    const fields = Object.keys(req.body);
+    if (fields.length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No fields to update" });
     }
 
-    await activity.update(req.body);
+    const setClauses = fields.map((field, idx) => `${field} = $${idx + 1}`);
+    const values = Object.values(req.body);
+    values.push(activityId);
+
+    const query = `
+      UPDATE activities
+      SET ${setClauses.join(", ")}
+      WHERE id = $${values.length}
+      RETURNING *
+    `;
+    const result = await pool.query(query, values);
+
+    if (result.rowCount === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Activity not found" });
+    }
 
     res.json({
       success: true,
-      message: 'Activity updated successfully',
-      data: {
-        activity: activity.getSummary()
-      }
+      message: "Activity updated successfully",
+      data: { activity: getSummary(result.rows[0]) },
     });
   } catch (error) {
-    console.error('Update activity error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    console.error("Update activity error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
-// Delete activity (Admin only)
+// Delete activity (soft delete)
 const deleteActivity = async (req, res) => {
   try {
     const { activityId } = req.params;
+    const query = `
+      UPDATE activities
+      SET is_active = false
+      WHERE id = $1
+      RETURNING id
+    `;
+    const result = await pool.query(query, [activityId]);
 
-    const activity = await Activity.findByPk(activityId);
-    if (!activity) {
-      return res.status(404).json({
-        success: false,
-        message: 'Activity not found'
-      });
+    if (result.rowCount === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Activity not found" });
     }
 
-    await activity.update({ isActive: false });
-
-    res.json({
-      success: true,
-      message: 'Activity deleted successfully'
-    });
+    res.json({ success: true, message: "Activity deleted successfully" });
   } catch (error) {
-    console.error('Delete activity error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    console.error("Delete activity error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
@@ -413,5 +425,5 @@ module.exports = {
   getPopularActivities,
   createActivity,
   updateActivity,
-  deleteActivity
+  deleteActivity,
 };

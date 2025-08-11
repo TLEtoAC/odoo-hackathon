@@ -1,128 +1,73 @@
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../db');
+const { sequelize } = require("../db");
 
-const Trip = sequelize.define('Trip', {
-  id: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true
-  },
-  userId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'users',
-      key: 'id'
-    }
-  },
-  name: {
-    type: DataTypes.STRING(100),
-    allowNull: false,
-    validate: {
-      len: [1, 100]
-    }
-  },
-  description: {
-    type: DataTypes.TEXT,
-    allowNull: true
-  },
-  startDate: {
-    type: DataTypes.DATEONLY,
-    allowNull: false
-  },
-  endDate: {
-    type: DataTypes.DATEONLY,
-    allowNull: false
-  },
-  coverPhoto: {
-    type: DataTypes.STRING(255),
-    allowNull: true
-  },
-  budget: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: true,
-    validate: {
-      min: 0
-    }
-  },
-  currency: {
-    type: DataTypes.STRING(3),
-    defaultValue: 'USD',
-    validate: {
-      len: [3, 3]
-    }
-  },
-  status: {
-    type: DataTypes.ENUM('planning', 'active', 'completed', 'cancelled'),
-    defaultValue: 'planning'
-  },
-  isPublic: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false
-  },
-  tags: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: []
-  },
-  settings: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: {
-      allowComments: true,
-      allowSharing: true,
-      notifications: true
-    }
-  }
-}, {
-  tableName: 'trips',
-  indexes: [
-    {
-      fields: ['userId']
-    },
-    {
-      fields: ['startDate']
-    },
-    {
-      fields: ['status']
-    },
-    {
-      fields: ['isPublic']
-    }
-  ]
-});
+async function initTripTable() {
+  await sequelize.query(`
+    CREATE TABLE IF NOT EXISTS trips (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name VARCHAR(100) NOT NULL,
+        description TEXT,
+        start_date DATE NOT NULL,
+        end_date DATE NOT NULL,
+        cover_photo VARCHAR(255),
+        budget DECIMAL(10, 2),
+        currency VARCHAR(3) DEFAULT 'USD',
+        status VARCHAR(20) DEFAULT 'planning',
+        is_public BOOLEAN DEFAULT FALSE,
+        tags JSON DEFAULT '[]',
+        settings JSON DEFAULT '{"allowComments": true, "allowSharing": true, "notifications": true}',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
 
-// Instance method to calculate trip duration
-Trip.prototype.getDuration = function() {
-  const start = new Date(this.startDate);
-  const end = new Date(this.endDate);
+  await sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_trips_user_id ON trips (user_id);`
+  );
+  await sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_trips_start_date ON trips (start_date);`
+  );
+  await sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_trips_status ON trips (status);`
+  );
+  await sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_trips_is_public ON trips (is_public);`
+  );
+}
+
+// Helper functions (replacing Sequelize instance methods)
+function getDuration(startDate, endDate) {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
   const diffTime = Math.abs(end - start);
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays;
-};
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
 
-// Instance method to check if trip is active
-Trip.prototype.isActive = function() {
+function isActive(startDate, endDate) {
   const today = new Date();
-  const start = new Date(this.startDate);
-  const end = new Date(this.endDate);
+  const start = new Date(startDate);
+  const end = new Date(endDate);
   return today >= start && today <= end;
-};
+}
 
-// Instance method to get trip summary
-Trip.prototype.getSummary = function() {
+function getSummary(trip) {
   return {
-    id: this.id,
-    name: this.name,
-    description: this.description,
-    startDate: this.startDate,
-    endDate: this.endDate,
-    duration: this.getDuration(),
-    status: this.status,
-    budget: this.budget,
-    currency: this.currency,
-    isPublic: this.isPublic
+    id: trip.id,
+    name: trip.name,
+    description: trip.description,
+    startDate: trip.start_date,
+    endDate: trip.end_date,
+    duration: getDuration(trip.start_date, trip.end_date),
+    status: trip.status,
+    budget: trip.budget,
+    currency: trip.currency,
+    isPublic: trip.is_public,
   };
-};
+}
 
-module.exports = Trip;
+module.exports = {
+  initTripTable,
+  getDuration,
+  isActive,
+  getSummary,
+};

@@ -1,225 +1,137 @@
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../db');
+// activity.js - Raw SQL version
 
-const Activity = sequelize.define('Activity', {
-  id: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true
-  },
-  cityId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'cities',
-      key: 'id'
-    }
-  },
-  name: {
-    type: DataTypes.STRING(200),
-    allowNull: false,
-    validate: {
-      len: [1, 200]
-    }
-  },
-  description: {
-    type: DataTypes.TEXT,
-    allowNull: true
-  },
-  type: {
-    type: DataTypes.ENUM('sightseeing', 'food', 'adventure', 'culture', 'shopping', 'entertainment', 'relaxation', 'transport', 'other'),
-    allowNull: false,
-    defaultValue: 'other'
-  },
-  category: {
-    type: DataTypes.STRING(100),
-    allowNull: true
-  },
-  duration: {
-    type: DataTypes.INTEGER, // in minutes
-    allowNull: true,
-    validate: {
-      min: 0
-    }
-  },
-  cost: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: true,
-    validate: {
-      min: 0
-    }
-  },
-  currency: {
-    type: DataTypes.STRING(3),
-    defaultValue: 'USD',
-    validate: {
-      len: [3, 3]
-    }
-  },
-  costType: {
-    type: DataTypes.ENUM('per_person', 'per_group', 'fixed', 'free'),
-    defaultValue: 'per_person'
-  },
-  location: {
-    type: DataTypes.STRING(200),
-    allowNull: true
-  },
-  latitude: {
-    type: DataTypes.DECIMAL(10, 8),
-    allowNull: true,
-    validate: {
-      min: -90,
-      max: 90
-    }
-  },
-  longitude: {
-    type: DataTypes.DECIMAL(11, 8),
-    allowNull: true,
-    validate: {
-      min: -180,
-      max: 180
-    }
-  },
-  images: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: []
-  },
-  tags: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: []
-  },
-  difficulty: {
-    type: DataTypes.ENUM('easy', 'moderate', 'challenging', 'expert'),
-    defaultValue: 'easy'
-  },
-  ageRestriction: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    validate: {
-      min: 0
-    }
-  },
-  bestTime: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: {}
-  },
-  requirements: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: []
-  },
-  tips: {
-    type: DataTypes.TEXT,
-    allowNull: true
-  },
-  rating: {
-    type: DataTypes.DECIMAL(3, 2),
-    allowNull: true,
-    defaultValue: 0,
-    validate: {
-      min: 0,
-      max: 5
-    }
-  },
-  reviewCount: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    defaultValue: 0,
-    validate: {
-      min: 0
-    }
-  },
-  isActive: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: true
-  }
-}, {
-  tableName: 'activities',
-  indexes: [
-    {
-      fields: ['name']
-    },
-    {
-      fields: ['type']
-    },
-    {
-      fields: ['category']
-    },
-    {
-      fields: ['cost']
-    },
-    {
-      fields: ['rating']
-    },
-    {
-      fields: ['cityId']
-    }
-  ]
-});
+const pool = require("./db");
 
-// Instance method to get coordinates
-Activity.prototype.getCoordinates = function() {
-  if (this.latitude && this.longitude) {
+// Create table if not exists
+async function createActivitiesTable() {
+  const query = `
+    CREATE TABLE IF NOT EXISTS activities (
+      id SERIAL PRIMARY KEY,
+      city_id INTEGER NOT NULL REFERENCES cities(id),
+      name VARCHAR(200) NOT NULL,
+      description TEXT,
+      type VARCHAR(50) NOT NULL DEFAULT 'other',
+      category VARCHAR(100),
+      duration INTEGER CHECK (duration >= 0),
+      cost NUMERIC(10, 2) CHECK (cost >= 0),
+      currency CHAR(3) DEFAULT 'USD' CHECK (char_length(currency) = 3),
+      cost_type VARCHAR(20) DEFAULT 'per_person',
+      location VARCHAR(200),
+      latitude NUMERIC(10, 8) CHECK (latitude >= -90 AND latitude <= 90),
+      longitude NUMERIC(11, 8) CHECK (longitude >= -180 AND longitude <= 180),
+      images JSON DEFAULT '[]',
+      tags JSON DEFAULT '[]',
+      difficulty VARCHAR(20) DEFAULT 'easy',
+      age_restriction INTEGER CHECK (age_restriction >= 0),
+      best_time JSON DEFAULT '{}',
+      requirements JSON DEFAULT '[]',
+      tips TEXT,
+      rating NUMERIC(3, 2) DEFAULT 0 CHECK (rating >= 0 AND rating <= 5),
+      review_count INTEGER DEFAULT 0 CHECK (review_count >= 0),
+      is_active BOOLEAN DEFAULT true
+    );
+  `;
+  await pool.query(query);
+}
+
+// Insert new activity
+async function insertActivity(activity) {
+  const query = `
+    INSERT INTO activities (
+      city_id, name, description, type, category, duration, cost, currency,
+      cost_type, location, latitude, longitude, images, tags, difficulty,
+      age_restriction, best_time, requirements, tips, rating, review_count, is_active
+    ) VALUES (
+      $1, $2, $3, $4, $5, $6, $7, $8,
+      $9, $10, $11, $12, $13, $14, $15,
+      $16, $17, $18, $19, $20, $21, $22
+    ) RETURNING *;
+  `;
+  const values = [
+    activity.city_id,
+    activity.name,
+    activity.description,
+    activity.type,
+    activity.category,
+    activity.duration,
+    activity.cost,
+    activity.currency,
+    activity.cost_type,
+    activity.location,
+    activity.latitude,
+    activity.longitude,
+    JSON.stringify(activity.images || []),
+    JSON.stringify(activity.tags || []),
+    activity.difficulty,
+    activity.age_restriction,
+    JSON.stringify(activity.best_time || {}),
+    JSON.stringify(activity.requirements || []),
+    activity.tips,
+    activity.rating,
+    activity.review_count,
+    activity.is_active,
+  ];
+
+  const result = await pool.query(query, values);
+  return result.rows[0];
+}
+
+// Utility methods
+function getCoordinates(activity) {
+  if (activity.latitude && activity.longitude) {
     return {
-      lat: parseFloat(this.latitude),
-      lng: parseFloat(this.longitude)
+      lat: parseFloat(activity.latitude),
+      lng: parseFloat(activity.longitude),
     };
   }
   return null;
-};
+}
 
-// Instance method to get duration in hours
-Activity.prototype.getDurationHours = function() {
-  if (this.duration) {
-    return (this.duration / 60).toFixed(1);
+function getDurationHours(activity) {
+  return activity.duration ? (activity.duration / 60).toFixed(1) : null;
+}
+
+function getCostPerPerson(activity) {
+  if (!activity.cost) return 0;
+  switch (activity.cost_type) {
+    case "per_person":
+      return parseFloat(activity.cost);
+    case "per_group":
+      return parseFloat(activity.cost) / 2;
+    case "fixed":
+      return parseFloat(activity.cost);
+    case "free":
+      return 0;
+    default:
+      return parseFloat(activity.cost);
   }
-  return null;
-};
+}
 
-// Instance method to get cost per person
-Activity.prototype.getCostPerPerson = function() {
-  if (this.cost) {
-    switch (this.costType) {
-      case 'per_person':
-        return parseFloat(this.cost);
-      case 'per_group':
-        return parseFloat(this.cost) / 2; // Assuming average group size of 2
-      case 'fixed':
-        return parseFloat(this.cost);
-      case 'free':
-        return 0;
-      default:
-        return parseFloat(this.cost);
-    }
-  }
-  return 0;
-};
-
-// Instance method to get activity summary
-Activity.prototype.getSummary = function() {
+function getSummary(activity) {
   return {
-    id: this.id,
-    name: this.name,
-    description: this.description,
-    type: this.type,
-    category: this.category,
-    duration: this.duration,
-    durationHours: this.getDurationHours(),
-    cost: this.cost,
-    costPerPerson: this.getCostPerPerson(),
-    currency: this.currency,
-    costType: this.costType,
-    location: this.location,
-    coordinates: this.getCoordinates(),
-    images: this.images,
-    tags: this.tags,
-    difficulty: this.difficulty,
-    rating: this.rating,
-    reviewCount: this.reviewCount
+    id: activity.id,
+    name: activity.name,
+    description: activity.description,
+    type: activity.type,
+    category: activity.category,
+    duration: activity.duration,
+    durationHours: getDurationHours(activity),
+    cost: activity.cost,
+    costPerPerson: getCostPerPerson(activity),
+    currency: activity.currency,
+    costType: activity.cost_type,
+    location: activity.location,
+    coordinates: getCoordinates(activity),
+    images: activity.images,
+    tags: activity.tags,
+    difficulty: activity.difficulty,
+    rating: activity.rating,
+    reviewCount: activity.review_count,
   };
-};
+}
 
-module.exports = Activity;
+module.exports = {
+  createActivitiesTable,
+  insertActivity,
+  getSummary,
+};

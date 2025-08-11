@@ -1,168 +1,113 @@
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../db');
+const { sequelize } = require("../db");
 
-const City = sequelize.define('City', {
-  id: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true
-  },
-  name: {
-    type: DataTypes.STRING(100),
-    allowNull: false,
-    validate: {
-      len: [1, 100]
-    }
-  },
-  country: {
-    type: DataTypes.STRING(100),
-    allowNull: false,
-    validate: {
-      len: [1, 100]
-    }
-  },
-  countryCode: {
-    type: DataTypes.STRING(3),
-    allowNull: false,
-    validate: {
-      len: [2, 3]
-    }
-  },
-  region: {
-    type: DataTypes.STRING(100),
-    allowNull: true
-  },
-  latitude: {
-    type: DataTypes.DECIMAL(10, 8),
-    allowNull: true,
-    validate: {
-      min: -90,
-      max: 90
-    }
-  },
-  longitude: {
-    type: DataTypes.DECIMAL(11, 8),
-    allowNull: true,
-    validate: {
-      min: -180,
-      max: 180
-    }
-  },
-  timezone: {
-    type: DataTypes.STRING(50),
-    allowNull: true
-  },
-  population: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    validate: {
-      min: 0
-    }
-  },
-  costIndex: {
-    type: DataTypes.DECIMAL(5, 2),
-    allowNull: true,
-    validate: {
-      min: 0
-    }
-  },
-  popularity: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    defaultValue: 0,
-    validate: {
-      min: 0,
-      max: 100
-    }
-  },
-  description: {
-    type: DataTypes.TEXT,
-    allowNull: true
-  },
-  highlights: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: []
-  },
-  images: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: []
-  },
-  climate: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: {}
-  },
-  languages: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: []
-  },
-  currency: {
-    type: DataTypes.STRING(3),
-    allowNull: true,
-    defaultValue: 'USD'
-  },
-  isActive: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: true
+// Create the cities table + indexes
+async function initCityTable() {
+  await sequelize.query(`
+    CREATE TABLE IF NOT EXISTS cities (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL CHECK (char_length(name) BETWEEN 1 AND 100),
+        country VARCHAR(100) NOT NULL CHECK (char_length(country) BETWEEN 1 AND 100),
+        countryCode VARCHAR(3) NOT NULL CHECK (char_length(countryCode) BETWEEN 2 AND 3),
+        region VARCHAR(100),
+        latitude DECIMAL(10, 8) CHECK (latitude >= -90 AND latitude <= 90),
+        longitude DECIMAL(11, 8) CHECK (longitude >= -180 AND longitude <= 180),
+        timezone VARCHAR(50),
+        population INTEGER CHECK (population >= 0),
+        costIndex DECIMAL(5, 2) CHECK (costIndex >= 0),
+        popularity INTEGER DEFAULT 0 CHECK (popularity >= 0 AND popularity <= 100),
+        description TEXT,
+        highlights JSON DEFAULT '[]',
+        images JSON DEFAULT '[]',
+        climate JSON DEFAULT '{}',
+        languages JSON DEFAULT '[]',
+        currency VARCHAR(3) DEFAULT 'USD',
+        isActive BOOLEAN DEFAULT TRUE
+    );
+  `);
+
+  // Indexes
+  await sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_cities_name ON cities (name);`
+  );
+  await sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_cities_country ON cities (country);`
+  );
+  await sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_cities_countryCode ON cities (countryCode);`
+  );
+  await sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_cities_popularity ON cities (popularity);`
+  );
+  await sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_cities_costIndex ON cities (costIndex);`
+  );
+}
+
+// ===== Helper functions =====
+function getFullLocation(city) {
+  if (city.region) {
+    return `${city.name}, ${city.region}, ${city.country}`;
   }
-}, {
-  tableName: 'cities',
-  indexes: [
-    {
-      fields: ['name']
-    },
-    {
-      fields: ['country']
-    },
-    {
-      fields: ['countryCode']
-    },
-    {
-      fields: ['popularity']
-    },
-    {
-      fields: ['costIndex']
-    }
-  ]
-});
+  return `${city.name}, ${city.country}`;
+}
 
-// Instance method to get full location string
-City.prototype.getFullLocation = function() {
-  if (this.region) {
-    return `${this.name}, ${this.region}, ${this.country}`;
-  }
-  return `${this.name}, ${this.country}`;
-};
-
-// Instance method to get coordinates
-City.prototype.getCoordinates = function() {
-  if (this.latitude && this.longitude) {
+function getCoordinates(city) {
+  if (city.latitude && city.longitude) {
     return {
-      lat: parseFloat(this.latitude),
-      lng: parseFloat(this.longitude)
+      lat: parseFloat(city.latitude),
+      lng: parseFloat(city.longitude),
     };
   }
   return null;
-};
+}
 
-// Instance method to get city summary
-City.prototype.getSummary = function() {
+function getSummary(city) {
   return {
-    id: this.id,
-    name: this.name,
-    country: this.country,
-    countryCode: this.countryCode,
-    region: this.region,
-    coordinates: this.getCoordinates(),
-    costIndex: this.costIndex,
-    popularity: this.popularity,
-    description: this.description,
-    highlights: this.highlights,
-    images: this.images
+    id: city.id,
+    name: city.name,
+    country: city.country,
+    countryCode: city.countryCode,
+    region: city.region,
+    coordinates: getCoordinates(city),
+    costIndex: city.costIndex,
+    popularity: city.popularity,
+    description: city.description,
+    highlights: city.highlights,
+    images: city.images,
   };
-};
+}
 
-module.exports = City;
+// ===== Data Access Functions =====
+async function getCityById(id) {
+  const [results] = await sequelize.query(
+    `SELECT * FROM cities WHERE id = $1`,
+    {
+      bind: [id],
+    }
+  );
+  return results[0] || null;
+}
+
+async function insertCity(data) {
+  const fields = Object.keys(data);
+  const values = Object.values(data);
+  const placeholders = fields.map((_, i) => `$${i + 1}`).join(", ");
+
+  const [result] = await sequelize.query(
+    `INSERT INTO cities (${fields.join(
+      ", "
+    )}) VALUES (${placeholders}) RETURNING *`,
+    { bind: values }
+  );
+
+  return result[0];
+}
+
+module.exports = {
+  initCityTable,
+  getFullLocation,
+  getCoordinates,
+  getSummary,
+  getCityById,
+  insertCity,
+};

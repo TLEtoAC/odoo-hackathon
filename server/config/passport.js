@@ -1,37 +1,26 @@
 const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
-const { User } = require('../modules');
+const pool = require('../dbPool');
+const bcrypt = require('bcryptjs');
 
-// Local Strategy for username/password authentication
+// Local Strategy for email/password authentication
 passport.use(new LocalStrategy(
-  {
-    usernameField: 'email',
-    passwordField: 'password'
-  },
+  { usernameField: 'email', passwordField: 'password' },
   async (email, password, done) => {
     try {
-      // Find user by email
-      const user = await User.findOne({ where: { email } });
-      
-      if (!user) {
-        return done(null, false, { message: 'Invalid credentials' });
-      }
+      const r = await pool.query('SELECT * FROM users WHERE email=$1 LIMIT 1', [email]);
+      if (r.rowCount === 0) return done(null, false, { message: 'Invalid credentials' });
+      const user = r.rows[0];
+      if (user.is_active === false) return done(null, false, { message: 'Account is deactivated' });
 
-      // Check if user is active
-      if (!user.isActive) {
-        return done(null, false, { message: 'Account is deactivated' });
-      }
-
-      // Verify password
-      const isPasswordValid = await user.comparePassword(password);
-      if (!isPasswordValid) {
-        return done(null, false, { message: 'Invalid credentials' });
-      }
+      const ok = await bcrypt.compare(password, user.password);
+      if (!ok) return done(null, false, { message: 'Invalid credentials' });
 
       // Update last login
-      await user.update({ lastLogin: new Date() });
+      await pool.query('UPDATE users SET last_login=NOW() WHERE id=$1', [user.id]);
 
-      return done(null, user);
+      const publicUser = { id: user.id, email: user.email, username: user.username, firstName: user.first_name, lastName: user.last_name };
+      return done(null, publicUser);
     } catch (error) {
       return done(error);
     }
@@ -39,15 +28,14 @@ passport.use(new LocalStrategy(
 ));
 
 // Serialize user for the session
-passport.serializeUser((user, done) => {
-  done(null, user.id);
-});
+passport.serializeUser((user, done) => { done(null, user.id); });
 
 // Deserialize user from the session
 passport.deserializeUser(async (id, done) => {
   try {
-    const user = await User.findByPk(id);
-    done(null, user);
+    const r = await pool.query('SELECT id, email, username, first_name AS "firstName", last_name AS "lastName", is_active AS "isActive" FROM users WHERE id=$1', [id]);
+    if (r.rowCount === 0) return done(null, false);
+    done(null, r.rows[0]);
   } catch (error) {
     done(error);
   }

@@ -1,4 +1,4 @@
-const { Trip, TripStop, City, TripActivity, Activity, User } = require('../modules');
+const pool = require('../dbPool');
 const { validationResult } = require('express-validator');
 
 // Create new trip
@@ -6,110 +6,43 @@ const createTrip = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
+      return res.status(400).json({ success: false, message: 'Validation failed', errors: errors.array() });
     }
 
     const { name, description, startDate, endDate, budget, currency, tags } = req.body;
-
-    // Validate dates
     if (new Date(startDate) >= new Date(endDate)) {
-      return res.status(400).json({
-        success: false,
-        message: 'End date must be after start date'
-      });
+      return res.status(400).json({ success: false, message: 'End date must be after start date' });
     }
 
-    const trip = await Trip.create({
-      name,
-      description,
-      startDate,
-      endDate,
-      budget,
-      currency,
-      tags,
-      userId: req.user.id
-    });
+    const insert = await pool.query(
+      `INSERT INTO trips (user_id, name, description, start_date, end_date, budget, currency, tags)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+       RETURNING id, name, description, start_date AS "startDate", end_date AS "endDate", budget, currency, is_public AS "isPublic", status`,
+      [req.user.id, name, description || null, startDate, endDate, budget || null, currency || 'USD', JSON.stringify(tags || [])]
+    );
 
-    res.status(201).json({
-      success: true,
-      message: 'Trip created successfully',
-      data: {
-        trip: trip.getSummary()
-      }
-    });
+    res.status(201).json({ success: true, message: 'Trip created successfully', data: { trip: insert.rows[0] } });
   } catch (error) {
     console.error('Create trip error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
 
 // Get user's trips
 const getUserTrips = async (req, res) => {
   try {
-    const { page = 1, limit = 10, status, search } = req.query;
-    const offset = (page - 1) * limit;
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const count = await pool.query('SELECT COUNT(*)::int AS c FROM trips WHERE user_id=$1', [req.user.id]);
+    const rows = await pool.query(
+      `SELECT id, name, description, start_date AS "startDate", end_date AS "endDate", budget, currency, status, is_public AS "isPublic"
+       FROM trips WHERE user_id=$1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+      [req.user.id, parseInt(limit), offset]
+    );
 
-    const whereClause = { userId: req.user.id };
-    if (status) whereClause.status = status;
-    if (search) {
-      whereClause[require('sequelize').Op.or] = [
-        { name: { [require('sequelize').Op.like]: `%${search}%` } },
-        { description: { [require('sequelize').Op.like]: `%${search}%` } }
-      ];
-    }
-
-    const { count, rows: trips } = await Trip.findAndCountAll({
-      where: whereClause,
-      include: [
-        {
-          model: TripStop,
-          as: 'stops',
-          include: [
-            {
-              model: City,
-              as: 'city',
-              attributes: ['id', 'name', 'country', 'countryCode']
-            }
-          ]
-        }
-      ],
-      order: [['createdAt', 'DESC']],
-      limit: parseInt(limit),
-      offset: parseInt(offset)
-    });
-
-    const formattedTrips = trips.map(trip => {
-      const tripData = trip.getSummary();
-      tripData.stopCount = trip.stops?.length || 0;
-      tripData.destinations = trip.stops?.map(stop => stop.city?.name).filter(Boolean) || [];
-      return tripData;
-    });
-
-    res.json({
-      success: true,
-      data: {
-        trips: formattedTrips,
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(count / limit),
-          totalItems: count,
-          itemsPerPage: parseInt(limit)
-        }
-      }
-    });
+    res.json({ success: true, data: { trips: rows.rows, pagination: { currentPage: parseInt(page), totalPages: Math.ceil(count.rows[0].c / limit), totalItems: count.rows[0].c, itemsPerPage: parseInt(limit) } } });
   } catch (error) {
-    console.error('Get user trips error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
 
@@ -117,127 +50,67 @@ const getUserTrips = async (req, res) => {
 const getTripById = async (req, res) => {
   try {
     const { tripId } = req.params;
+    const t = await pool.query(
+      `SELECT id, name, description, start_date AS "startDate", end_date AS "endDate", budget, currency, status, is_public AS "isPublic" FROM trips WHERE id=$1 AND user_id=$2`,
+      [tripId, req.user.id]
+    );
+    if (t.rowCount === 0) return res.status(404).json({ success: false, message: 'Trip not found' });
 
-    const trip = await Trip.findOne({
-      where: { id: tripId, userId: req.user.id },
-      include: [
-        {
-          model: TripStop,
-          as: 'stops',
-          include: [
-            {
-              model: City,
-              as: 'city',
-              attributes: ['id', 'name', 'country', 'countryCode', 'description', 'images']
-            },
-            {
-              model: TripActivity,
-              as: 'activities',
-              include: [
-                {
-                  model: Activity,
-                  as: 'activity',
-                  attributes: ['id', 'name', 'description', 'type', 'duration', 'cost', 'images']
-                }
-              ]
-            }
-          ],
-          order: [['order', 'ASC']]
-        }
-      ]
-    });
+    // Stops
+    const stops = await pool.query(
+      `SELECT ts.id, ts.order, ts.arrival_date AS "arrivalDate", ts.departure_date AS "departureDate", ts.estimated_cost AS "estimatedCost",
+              c.id AS "cityId", c.name AS "cityName", c.country, c.country_code AS "countryCode", c.latitude, c.longitude
+       FROM trip_stops ts
+       LEFT JOIN cities c ON c.id = ts.city_id
+       WHERE ts.trip_id=$1
+       ORDER BY ts.order ASC`,
+      [tripId]
+    );
 
-    if (!trip) {
-      return res.status(404).json({
-        success: false,
-        message: 'Trip not found'
-      });
-    }
+    const trip = t.rows[0];
+    trip.stops = stops.rows;
 
-    const tripData = trip.getSummary();
-    tripData.stops = trip.stops?.map(stop => ({
-      ...stop.getSummary(),
-      city: stop.city?.getSummary(),
-      activities: stop.activities?.map(ta => ({
-        ...ta.getSummary(),
-        activity: ta.activity?.getSummary()
-      })) || []
-    })) || [];
-
-    res.json({
-      success: true,
-      data: {
-        trip: tripData
-      }
-    });
+    res.json({ success: true, data: { trip } });
   } catch (error) {
-    console.error('Get trip error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
 
 // Update trip
 const updateTrip = async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
-    }
-
     const { tripId } = req.params;
     const { name, description, startDate, endDate, budget, currency, tags, isPublic } = req.body;
 
-    const trip = await Trip.findOne({
-      where: { id: tripId, userId: req.user.id }
-    });
-
-    if (!trip) {
-      return res.status(404).json({
-        success: false,
-        message: 'Trip not found'
-      });
-    }
-
-    // Validate dates if provided
     if (startDate && endDate && new Date(startDate) >= new Date(endDate)) {
-      return res.status(400).json({
-        success: false,
-        message: 'End date must be after start date'
-      });
+      return res.status(400).json({ success: false, message: 'End date must be after start date' });
     }
 
-    const updateData = {};
-    if (name !== undefined) updateData.name = name;
-    if (description !== undefined) updateData.description = description;
-    if (startDate !== undefined) updateData.startDate = startDate;
-    if (endDate !== undefined) updateData.endDate = endDate;
-    if (budget !== undefined) updateData.budget = budget;
-    if (currency !== undefined) updateData.currency = currency;
-    if (tags !== undefined) updateData.tags = tags;
-    if (isPublic !== undefined) updateData.isPublic = isPublic;
+    const set = [];
+    const values = [];
+    let idx = 1;
+    const setField = (col, val) => { set.push(`${col}=$${idx++}`); values.push(val); };
+    if (name !== undefined) setField('name', name);
+    if (description !== undefined) setField('description', description);
+    if (startDate !== undefined) setField('start_date', startDate);
+    if (endDate !== undefined) setField('end_date', endDate);
+    if (budget !== undefined) setField('budget', budget);
+    if (currency !== undefined) setField('currency', currency);
+    if (tags !== undefined) setField('tags', JSON.stringify(tags));
+    if (isPublic !== undefined) setField('is_public', !!isPublic);
 
-    await trip.update(updateData);
+    values.push(tripId); values.push(req.user.id);
 
-    res.json({
-      success: true,
-      message: 'Trip updated successfully',
-      data: {
-        trip: trip.getSummary()
-      }
-    });
+    await pool.query(`UPDATE trips SET ${set.join(', ')}, updated_at=NOW() WHERE id=$${idx++} AND user_id=$${idx} `, values);
+
+    const updated = await pool.query(
+      `SELECT id, name, description, start_date AS "startDate", end_date AS "endDate", budget, currency, status, is_public AS "isPublic" FROM trips WHERE id=$1 AND user_id=$2`,
+      [tripId, req.user.id]
+    );
+
+    res.json({ success: true, message: 'Trip updated successfully', data: { trip: updated.rows[0] } });
   } catch (error) {
-    console.error('Update trip error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
 
@@ -245,107 +118,28 @@ const updateTrip = async (req, res) => {
 const deleteTrip = async (req, res) => {
   try {
     const { tripId } = req.params;
-
-    const trip = await Trip.findOne({
-      where: { id: tripId, userId: req.user.id }
-    });
-
-    if (!trip) {
-      return res.status(404).json({
-        success: false,
-        message: 'Trip not found'
-      });
-    }
-
-    await trip.destroy();
-
-    res.json({
-      success: true,
-      message: 'Trip deleted successfully'
-    });
+    await pool.query('DELETE FROM trips WHERE id=$1 AND user_id=$2', [tripId, req.user.id]);
+    res.json({ success: true, message: 'Trip deleted successfully' });
   } catch (error) {
-    console.error('Delete trip error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
 
-// Get public trips
+// Public trips
 const getPublicTrips = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search, country } = req.query;
-    const offset = (page - 1) * limit;
-
-    const whereClause = { isPublic: true };
-    if (search) {
-      whereClause[require('sequelize').Op.or] = [
-        { name: { [require('sequelize').Op.like]: `%${search}%` } },
-        { description: { [require('sequelize').Op.like]: `%${search}%` } }
-      ];
-    }
-
-    const { count, rows: trips } = await Trip.findAndCountAll({
-      where: whereClause,
-      include: [
-        {
-          model: User,
-          as: 'user',
-          attributes: ['id', 'username', 'firstName', 'lastName']
-        },
-        {
-          model: TripStop,
-          as: 'stops',
-          include: [
-            {
-              model: City,
-              as: 'city',
-              where: country ? { countryCode: country } : {},
-              attributes: ['id', 'name', 'country', 'countryCode']
-            }
-          ]
-        }
-      ],
-      order: [['createdAt', 'DESC']],
-      limit: parseInt(limit),
-      offset: parseInt(offset)
-    });
-
-    const formattedTrips = trips.map(trip => {
-      const tripData = trip.getSummary();
-      tripData.user = trip.user?.getPublicProfile();
-      tripData.stopCount = trip.stops?.length || 0;
-      tripData.destinations = trip.stops?.map(stop => stop.city?.name).filter(Boolean) || [];
-      return tripData;
-    });
-
-    res.json({
-      success: true,
-      data: {
-        trips: formattedTrips,
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(count / limit),
-          totalItems: count,
-          itemsPerPage: parseInt(limit)
-        }
-      }
-    });
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const count = await pool.query('SELECT COUNT(*)::int AS c FROM trips WHERE is_public=true');
+    const rows = await pool.query(
+      `SELECT id, name, description, start_date AS "startDate", end_date AS "endDate", budget, currency, status, is_public AS "isPublic"
+       FROM trips WHERE is_public=true ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+      [parseInt(limit), offset]
+    );
+    res.json({ success: true, data: { trips: rows.rows, pagination: { currentPage: parseInt(page), totalPages: Math.ceil(count.rows[0].c / limit), totalItems: count.rows[0].c, itemsPerPage: parseInt(limit) } } });
   } catch (error) {
-    console.error('Get public trips error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
 
-module.exports = {
-  createTrip,
-  getUserTrips,
-  getTripById,
-  updateTrip,
-  deleteTrip,
-  getPublicTrips
-};
+module.exports = { createTrip, getUserTrips, getTripById, updateTrip, deleteTrip, getPublicTrips };

@@ -1,82 +1,31 @@
-const User = require('./User');
-const Trip = require('./Trip');
-const City = require('./City');
-const Activity = require('./Activity');
-const TripStop = require('./TripStop');
-const TripActivity = require('./TripActivity');
+const { sequelize } = require("../db");
 
-// User - Trip relationship (One-to-Many)
-User.hasMany(Trip, {
-  foreignKey: 'userId',
-  as: 'trips',
-  onDelete: 'CASCADE'
-});
-Trip.belongsTo(User, {
-  foreignKey: 'userId',
-  as: 'user'
-});
+async function initRelationships() {
+  await sequelize.query(`
+    ALTER TABLE trips
+    ADD CONSTRAINT IF NOT EXISTS fk_trips_user
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE;
 
-// City - Activity relationship (One-to-Many)
-City.hasMany(Activity, {
-  foreignKey: 'cityId',
-  as: 'activities',
-  onDelete: 'CASCADE'
-});
-Activity.belongsTo(City, {
-  foreignKey: 'cityId',
-  as: 'city'
-});
+    ALTER TABLE activities
+    ADD CONSTRAINT IF NOT EXISTS fk_activities_city
+    FOREIGN KEY (cityId) REFERENCES cities(id) ON DELETE CASCADE;
 
-// Trip - TripStop relationship (One-to-Many)
-Trip.hasMany(TripStop, {
-  foreignKey: 'tripId',
-  as: 'stops',
-  onDelete: 'CASCADE'
-});
-TripStop.belongsTo(Trip, {
-  foreignKey: 'tripId',
-  as: 'trip'
-});
+    ALTER TABLE trip_stops
+    ADD CONSTRAINT IF NOT EXISTS fk_trip_stops_trip
+    FOREIGN KEY (tripId) REFERENCES trips(id) ON DELETE CASCADE;
 
-// City - TripStop relationship (One-to-Many)
-City.hasMany(TripStop, {
-  foreignKey: 'cityId',
-  as: 'tripStops',
-  onDelete: 'CASCADE'
-});
-TripStop.belongsTo(City, {
-  foreignKey: 'cityId',
-  as: 'city'
-});
+    ALTER TABLE trip_stops
+    ADD CONSTRAINT IF NOT EXISTS fk_trip_stops_city
+    FOREIGN KEY (cityId) REFERENCES cities(id) ON DELETE CASCADE;
 
-// TripStop - TripActivity relationship (One-to-Many)
-TripStop.hasMany(TripActivity, {
-  foreignKey: 'tripStopId',
-  as: 'activities',
-  onDelete: 'CASCADE'
-});
-TripActivity.belongsTo(TripStop, {
-  foreignKey: 'tripStopId',
-  as: 'tripStop'
-});
+    ALTER TABLE trip_activities
+    ADD CONSTRAINT IF NOT EXISTS fk_trip_activities_trip_stop
+    FOREIGN KEY (tripStopId) REFERENCES trip_stops(id) ON DELETE CASCADE;
 
-// Activity - TripActivity relationship (One-to-Many)
-Activity.hasMany(TripActivity, {
-  foreignKey: 'activityId',
-  as: 'tripActivities',
-  onDelete: 'CASCADE'
-});
-TripActivity.belongsTo(Activity, {
-  foreignKey: 'activityId',
-  as: 'activity'
-});
+    ALTER TABLE trip_activities
+    ADD CONSTRAINT IF NOT EXISTS fk_trip_activities_activity
+    FOREIGN KEY (activityId) REFERENCES activities(id) ON DELETE CASCADE;
+  `);
+}
 
-// Export all models
-module.exports = {
-  User,
-  Trip,
-  City,
-  Activity,
-  TripStop,
-  TripActivity
-};
+module.exports = { initRelationships };

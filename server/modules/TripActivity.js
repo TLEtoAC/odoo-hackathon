@@ -1,162 +1,90 @@
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../db');
-
-const TripActivity = sequelize.define('TripActivity', {
-  id: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true
-  },
-  tripStopId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'trip_stops',
-      key: 'id'
-    }
-  },
-  activityId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'activities',
-      key: 'id'
-    }
-  },
-  tripStopId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'trip_stops',
-      key: 'id'
-    },
-    onDelete: 'CASCADE'
-  },
-  activityId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'activities',
-      key: 'id'
-    },
-    onDelete: 'CASCADE'
-  },
-  scheduledDate: {
-    type: DataTypes.DATEONLY,
-    allowNull: false
-  },
-  startTime: {
-    type: DataTypes.TIME,
-    allowNull: true
-  },
-  endTime: {
-    type: DataTypes.TIME,
-    allowNull: true
-  },
-  duration: {
-    type: DataTypes.INTEGER, // in minutes
-    allowNull: true,
-    validate: {
-      min: 0
-    }
-  },
-  cost: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: true,
-    validate: {
-      min: 0
-    }
-  },
-  currency: {
-    type: DataTypes.STRING(3),
-    defaultValue: 'USD',
-    validate: {
-      len: [3, 3]
-    }
-  },
-  notes: {
-    type: DataTypes.TEXT,
-    allowNull: true
-  },
-  status: {
-    type: DataTypes.ENUM('planned', 'booked', 'completed', 'cancelled'),
-    defaultValue: 'planned'
-  },
-  bookingReference: {
-    type: DataTypes.STRING(100),
-    allowNull: true
-  },
-  priority: {
-    type: DataTypes.ENUM('low', 'medium', 'high', 'must_do'),
-    defaultValue: 'medium'
-  },
-  customFields: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    defaultValue: {}
-  }
-}, {
-  tableName: 'trip_activities',
-  indexes: [
-    {
-      fields: ['tripStopId']
-    },
-    {
-      fields: ['activityId']
-    },
-    {
-      fields: ['scheduledDate']
-    },
-    {
-      fields: ['status']
-    }
-  ]
+const { Pool } = require("pg");
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL, // or configure host/user/password/db
 });
 
-// Instance method to get time range string
-TripActivity.prototype.getTimeRange = function() {
-  if (this.startTime && this.endTime) {
-    return `${this.startTime} - ${this.endTime}`;
-  } else if (this.startTime) {
-    return `From ${this.startTime}`;
-  } else if (this.endTime) {
-    return `Until ${this.endTime}`;
-  }
-  return 'Time not specified';
-};
+async function initTripActivitiesTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS trip_activities (
+        id SERIAL PRIMARY KEY,
+        trip_stop_id INTEGER NOT NULL REFERENCES trip_stops(id) ON DELETE CASCADE,
+        activity_id INTEGER NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+        scheduled_date DATE NOT NULL,
+        start_time TIME,
+        end_time TIME,
+        duration INTEGER CHECK (duration >= 0),
+        cost DECIMAL(10, 2) CHECK (cost >= 0),
+        currency VARCHAR(3) DEFAULT 'USD' CHECK (char_length(currency) = 3),
+        notes TEXT,
+        status VARCHAR(20) DEFAULT 'planned' CHECK (status IN ('planned', 'booked', 'completed', 'cancelled')),
+        booking_reference VARCHAR(100),
+        priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'must_do')),
+        custom_fields JSON DEFAULT '{}'
+    );
+  `);
 
-// Instance method to get duration in hours
-TripActivity.prototype.getDurationHours = function() {
-  if (this.duration) {
-    return (this.duration / 60).toFixed(1);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_trip_activities_trip_stop_id ON trip_activities (trip_stop_id);`
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_trip_activities_activity_id ON trip_activities (activity_id);`
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_trip_activities_scheduled_date ON trip_activities (scheduled_date);`
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_trip_activities_status ON trip_activities (status);`
+  );
+}
+
+// Plain JS helper functions (no ORM)
+function getTimeRange(activity) {
+  if (activity.start_time && activity.end_time) {
+    return `${activity.start_time} - ${activity.end_time}`;
+  } else if (activity.start_time) {
+    return `From ${activity.start_time}`;
+  } else if (activity.end_time) {
+    return `Until ${activity.end_time}`;
+  }
+  return "Time not specified";
+}
+
+function getDurationHours(activity) {
+  if (activity.duration != null) {
+    return (activity.duration / 60).toFixed(1);
   }
   return null;
-};
+}
 
-// Instance method to check if activity is today
-TripActivity.prototype.isToday = function() {
-  const today = new Date().toISOString().split('T')[0];
-  return this.scheduledDate === today;
-};
+function isToday(activity) {
+  const today = new Date().toISOString().split("T")[0];
+  return activity.scheduled_date === today;
+}
 
-// Instance method to get activity summary
-TripActivity.prototype.getSummary = function() {
+function getSummary(activity) {
   return {
-    id: this.id,
-    scheduledDate: this.scheduledDate,
-    startTime: this.startTime,
-    endTime: this.endTime,
-    timeRange: this.getTimeRange(),
-    duration: this.duration,
-    durationHours: this.getDurationHours(),
-    cost: this.cost,
-    currency: this.currency,
-    notes: this.notes,
-    status: this.status,
-    bookingReference: this.bookingReference,
-    priority: this.priority,
-    customFields: this.customFields
+    id: activity.id,
+    scheduledDate: activity.scheduled_date,
+    startTime: activity.start_time,
+    endTime: activity.end_time,
+    timeRange: getTimeRange(activity),
+    duration: activity.duration,
+    durationHours: getDurationHours(activity),
+    cost: activity.cost,
+    currency: activity.currency,
+    notes: activity.notes,
+    status: activity.status,
+    bookingReference: activity.booking_reference,
+    priority: activity.priority,
+    customFields: activity.custom_fields,
   };
-};
+}
 
-module.exports = TripActivity;
+module.exports = {
+  initTripActivitiesTable,
+  getTimeRange,
+  getDurationHours,
+  isToday,
+  getSummary,
+  pool, // export so you can reuse DB connection
+};

@@ -3,7 +3,7 @@ import { gsap } from "gsap";
 import { Link } from "react-router-dom";
 import { dashboardAPI, exploreAPI, integrationsAPI } from '../services/api';
 // React Icons
-import { FaPlane, FaUser, FaSearch, FaFilter, FaTh, FaSort, FaSuitcase, FaPlus } from 'react-icons/fa';
+import { FaPlane, FaUser, FaSearch, FaFilter, FaTh, FaSort, FaSuitcase, FaPlus, FaRoute } from 'react-icons/fa';
 
 const MainLanding = () => {
   const headerRef = useRef(null);
@@ -243,7 +243,7 @@ const MainLanding = () => {
         </div>
       </div>
 
-    
+      
       <section className="px-4 sm:px-8 py-4">
         <h2 className="text-lg font-semibold mb-3 text-blue-800">
           Top Regional Selections
@@ -255,7 +255,7 @@ const MainLanding = () => {
               ref={(el) => (topRegionsRef.current[i] = el)}
               className="bg-blue-100 hover:bg-blue-200 cursor-pointer aspect-square rounded-lg flex flex-col items-center justify-center text-blue-700 font-medium shadow-sm transition overflow-hidden relative"
             >
-                             <img
+              <img
                  src={city.imageUrl || `https://placehold.co/150x150/6EE7B7/1F2937?text=${city.name || `Region ${i+1}`}`}
                  alt={city.name || `Region ${i+1}`}
                  className="w-full h-full object-cover rounded-lg"
@@ -271,7 +271,7 @@ const MainLanding = () => {
         </div>
       </section>
 
-    
+      
       <section className="px-4 sm:px-8 py-4 flex-1">
         <h2 className="text-lg font-semibold mb-3 text-blue-800">Previous Trips</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -281,7 +281,7 @@ const MainLanding = () => {
               ref={(el) => (tripsRef.current[i] = el)}
               className="bg-blue-100 hover:bg-blue-200 cursor-pointer rounded-lg flex flex-col items-center justify-center text-blue-700 font-medium aspect-[3/4] shadow-sm transition overflow-hidden relative"
             >
-                             <img
+              <img
                  src={tripImages[trip.id || i] || `https://placehold.co/300x400/93C5FD/1E40AF?text=${trip.name || `Trip ${i+1}`}`}
                  alt={trip.name || `Trip ${i+1}`}
                  className="w-full h-full object-cover rounded-lg"
@@ -289,9 +289,35 @@ const MainLanding = () => {
                    e.target.src = `https://placehold.co/300x400/93C5FD/1E40AF?text=${trip.name || `Trip ${i+1}`}`;
                  }}
                />
-              <div className="absolute bottom-2 left-2 text-white font-semibold bg-blue-900 bg-opacity-70 px-3 py-1 rounded flex items-center">
-                <FaSuitcase className="mr-2" />
-                {trip.name || `Trip ${i+1}`}
+              <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
+                <div className="text-white font-semibold bg-blue-900 bg-opacity-70 px-3 py-1 rounded flex items-center">
+                  <FaSuitcase className="mr-2" />
+                  {trip.name || `Trip ${i+1}`}
+                </div>
+                <Link to={`/trip/${trip.id}/map`} className="bg-white text-blue-700 px-3 py-1 rounded-full flex items-center gap-2 shadow hover:shadow-md">
+                  <FaRoute /> Route
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Recommendations */}
+      <section className="px-4 sm:px-8 py-6">
+        <h2 className="text-lg font-semibold mb-3 text-blue-800">Recommended For You</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {dashboardData.popularCities.slice(0,3).map((city, idx) => (
+            <div key={city.id || idx} className="bg-white rounded-xl shadow p-4 flex items-center gap-3">
+              <img
+                src={city.imageUrl || `https://placehold.co/80x80/6EE7B7/1F2937?text=${city.name?.charAt(0) || 'C'}`}
+                alt={city.name}
+                className="w-20 h-20 object-cover rounded-lg"
+              />
+              <div>
+                <div className="font-semibold">{city.name}</div>
+                <div className="text-sm text-gray-600">{city.country}</div>
+                <div className="text-xs text-gray-500">Popularity: {city.popularity}%</div>
               </div>
             </div>
           ))}

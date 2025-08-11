@@ -1,79 +1,103 @@
-const { City, Activity } = require('../modules');
-const { Op } = require('sequelize');
+const pool = require('../dbPool');
 
 // Search cities
 const searchCities = async (req, res) => {
   try {
-    const { 
-      q = '', 
-      country, 
-      region, 
-      page = 1, 
+    let {
+      q = "",
+      country,
+      region,
+      page = 1,
       limit = 20,
-      sortBy = 'popularity',
-      sortOrder = 'DESC'
+      sortBy = "popularity",
+      sortOrder = "DESC",
     } = req.query;
 
+    page = parseInt(page);
+    limit = parseInt(limit);
     const offset = (page - 1) * limit;
-    const whereClause = { isActive: true };
 
-    // Search query
+    // Build WHERE clause
+    const conditions = ['"isActive" = true'];
+    const params = [];
+    let paramIndex = 1;
+
     if (q) {
-      whereClause[Op.or] = [
-        { name: { [Op.like]: `%${q}%` } },
-        { country: { [Op.like]: `%${q}%` } },
-        { region: { [Op.like]: `%${q}%` } }
-      ];
+      conditions.push(`(
+        name ILIKE $${paramIndex} OR 
+        country ILIKE $${paramIndex} OR 
+        region ILIKE $${paramIndex}
+      )`);
+      params.push(`%${q}%`);
+      paramIndex++;
     }
 
-    // Filter by country
     if (country) {
-      whereClause.countryCode = country;
+      conditions.push(`"countryCode" = $${paramIndex}`);
+      params.push(country);
+      paramIndex++;
     }
 
-    // Filter by region
     if (region) {
-      whereClause.region = region;
+      conditions.push(`region = $${paramIndex}`);
+      params.push(region);
+      paramIndex++;
     }
 
     // Sorting
-    const orderClause = [[sortBy, sortOrder.toUpperCase()]];
-    if (sortBy === 'name') {
-      orderClause.push(['country', 'ASC']);
+    const allowedSort = [
+      "popularity",
+      "name",
+      "costIndex",
+      "region",
+      "country",
+    ];
+    if (!allowedSort.includes(sortBy)) sortBy = "popularity";
+    sortOrder = sortOrder.toUpperCase() === "ASC" ? "ASC" : "DESC";
+
+    let orderClause = `ORDER BY "${sortBy}" ${sortOrder}`;
+    if (sortBy === "name") {
+      orderClause += `, country ASC`;
     }
 
-    const { count, rows: cities } = await City.findAndCountAll({
-      where: whereClause,
-      order: orderClause,
-      limit: parseInt(limit),
-      offset: parseInt(offset),
-      attributes: [
-        'id', 'name', 'country', 'countryCode', 'region', 
-        'latitude', 'longitude', 'costIndex', 'popularity',
-        'description', 'highlights', 'images', 'currency'
-      ]
-    });
+    const whereClause = conditions.length
+      ? `WHERE ${conditions.join(" AND ")}`
+      : "";
 
-    const formattedCities = cities.map(city => city.getSummary());
+    // Count total
+    const countQuery = `SELECT COUNT(*) AS total FROM "Cities" ${whereClause}`;
+    const countResult = await pool.query(countQuery, params);
+    const totalItems = parseInt(countResult.rows[0].total);
+
+    // Fetch rows
+    const cityQuery = `
+      SELECT 
+        id, name, country, "countryCode", region,
+        latitude, longitude, "costIndex", popularity,
+        description, highlights, images, currency
+      FROM "Cities"
+      ${whereClause}
+      ${orderClause}
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+    const citiesResult = await pool.query(cityQuery, params);
+    const cities = citiesResult.rows; // Replace city.getSummary() logic manually if needed
 
     res.json({
       success: true,
       data: {
-        cities: formattedCities,
+        cities,
         pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(count / limit),
-          totalItems: count,
-          itemsPerPage: parseInt(limit)
-        }
-      }
+          currentPage: page,
+          totalPages: Math.ceil(totalItems / limit),
+          totalItems,
+          itemsPerPage: limit,
+        },
+      },
     });
   } catch (error) {
-    console.error('Search cities error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    console.error("Search cities error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
@@ -82,81 +106,70 @@ const getCityById = async (req, res) => {
   try {
     const { cityId } = req.params;
 
-    const city = await City.findOne({
-      where: { id: cityId, isActive: true },
-      include: [
-        {
-          model: Activity,
-          as: 'activities',
-          where: { isActive: true },
-          required: false,
-          attributes: [
-            'id', 'name', 'description', 'type', 'category',
-            'duration', 'cost', 'currency', 'rating', 'images'
-          ]
-        }
-      ]
-    });
-
-    if (!city) {
-      return res.status(404).json({
-        success: false,
-        message: 'City not found'
-      });
+    const cityQuery = `
+      SELECT * FROM "Cities"
+      WHERE id = $1 AND "isActive" = true
+    `;
+    const cityResult = await pool.query(cityQuery, [cityId]);
+    if (cityResult.rowCount === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "City not found" });
     }
+    const city = cityResult.rows[0];
 
-    const cityData = city.getSummary();
-    cityData.activities = city.activities?.map(activity => activity.getSummary()) || [];
+    const activitiesQuery = `
+      SELECT id, name, description, type, category,
+             duration, cost, currency, rating, images
+      FROM "Activities"
+      WHERE "cityId" = $1 AND "isActive" = true
+    `;
+    const activitiesResult = await pool.query(activitiesQuery, [cityId]);
+
+    city.activities = activitiesResult.rows;
 
     res.json({
       success: true,
-      data: {
-        city: cityData
-      }
+      data: { city },
     });
   } catch (error) {
-    console.error('Get city error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    console.error("Get city error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
 // Get popular cities
 const getPopularCities = async (req, res) => {
   try {
-    const { limit = 10, country } = req.query;
+    let { limit = 10, country } = req.query;
+    limit = parseInt(limit);
 
-    const whereClause = { isActive: true };
+    const conditions = ['"isActive" = true'];
+    const params = [];
+    let idx = 1;
+
     if (country) {
-      whereClause.countryCode = country;
+      conditions.push(`"countryCode" = $${idx}`);
+      params.push(country);
+      idx++;
     }
 
-    const cities = await City.findAll({
-      where: whereClause,
-      order: [['popularity', 'DESC']],
-      limit: parseInt(limit),
-      attributes: [
-        'id', 'name', 'country', 'countryCode', 'region',
-        'costIndex', 'popularity', 'images', 'currency'
-      ]
-    });
+    const whereClause = `WHERE ${conditions.join(" AND ")}`;
 
-    const formattedCities = cities.map(city => city.getSummary());
+    const query = `
+      SELECT id, name, country, "countryCode", region,
+             "costIndex", popularity, images, currency
+      FROM "Cities"
+      ${whereClause}
+      ORDER BY popularity DESC
+      LIMIT ${limit}
+    `;
+    const result = await pool.query(query, params);
 
-    res.json({
-      success: true,
-      data: {
-        cities: formattedCities
-      }
-    });
+    res.json({ success: true, data: { cities: result.rows } });
   } catch (error) {
-    console.error('Get popular cities error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    console.error("Get popular cities error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
@@ -164,78 +177,69 @@ const getPopularCities = async (req, res) => {
 const getCitiesByCountry = async (req, res) => {
   try {
     const { countryCode } = req.params;
-    const { page = 1, limit = 20 } = req.query;
+    let { page = 1, limit = 20 } = req.query;
+    page = parseInt(page);
+    limit = parseInt(limit);
     const offset = (page - 1) * limit;
 
-    const { count, rows: cities } = await City.findAndCountAll({
-      where: { 
-        countryCode: countryCode.toUpperCase(),
-        isActive: true 
-      },
-      order: [['name', 'ASC']],
-      limit: parseInt(limit),
-      offset: parseInt(offset),
-      attributes: [
-        'id', 'name', 'country', 'countryCode', 'region',
-        'costIndex', 'popularity', 'images', 'currency'
-      ]
-    });
+    const countQuery = `
+      SELECT COUNT(*) AS total
+      FROM "Cities"
+      WHERE "countryCode" = $1 AND "isActive" = true
+    `;
+    const countResult = await pool.query(countQuery, [
+      countryCode.toUpperCase(),
+    ]);
+    const totalItems = parseInt(countResult.rows[0].total);
 
-    const formattedCities = cities.map(city => city.getSummary());
+    const citiesQuery = `
+      SELECT id, name, country, "countryCode", region,
+             "costIndex", popularity, images, currency
+      FROM "Cities"
+      WHERE "countryCode" = $1 AND "isActive" = true
+      ORDER BY name ASC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+    const citiesResult = await pool.query(citiesQuery, [
+      countryCode.toUpperCase(),
+    ]);
 
     res.json({
       success: true,
       data: {
-        cities: formattedCities,
+        cities: citiesResult.rows,
         pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(count / limit),
-          totalItems: count,
-          itemsPerPage: parseInt(limit)
-        }
-      }
+          currentPage: page,
+          totalPages: Math.ceil(totalItems / limit),
+          totalItems,
+          itemsPerPage: limit,
+        },
+      },
     });
   } catch (error) {
-    console.error('Get cities by country error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    console.error("Get cities by country error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
 // Get countries list
 const getCountries = async (req, res) => {
   try {
-    const countries = await City.findAll({
-      attributes: [
-        'countryCode',
-        'country',
-        [require('sequelize').fn('COUNT', require('sequelize').col('id')), 'cityCount']
-      ],
-      where: { isActive: true },
-      group: ['countryCode', 'country'],
-      order: [['country', 'ASC']]
-    });
+    const query = `
+      SELECT "countryCode" AS code,
+             country AS name,
+             COUNT(id) AS "cityCount"
+      FROM "Cities"
+      WHERE "isActive" = true
+      GROUP BY "countryCode", country
+      ORDER BY country ASC
+    `;
+    const result = await pool.query(query);
 
-    const formattedCountries = countries.map(country => ({
-      code: country.countryCode,
-      name: country.country,
-      cityCount: parseInt(country.dataValues.cityCount)
-    }));
-
-    res.json({
-      success: true,
-      data: {
-        countries: formattedCountries
-      }
-    });
+    res.json({ success: true, data: { countries: result.rows } });
   } catch (error) {
-    console.error('Get countries error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    console.error("Get countries error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
@@ -244,5 +248,5 @@ module.exports = {
   getCityById,
   getPopularCities,
   getCitiesByCountry,
-  getCountries
+  getCountries,
 };

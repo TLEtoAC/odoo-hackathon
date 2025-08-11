@@ -1,13 +1,11 @@
 import axios from 'axios';
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5001') + '/api';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:9000') + '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 });
 
 // Auth API
@@ -25,6 +23,12 @@ export const tripsAPI = {
   getById: (id) => api.get(`/trips/${id}`),
   update: (id, data) => api.put(`/trips/${id}`, data),
   delete: (id) => api.delete(`/trips/${id}`),
+  getPublicTrips: (params) => api.get('/trips/public/explore', { params }),
+};
+
+// Itinerary API (for route rendering)
+export const itineraryAPI = {
+  getItinerary: (tripId) => api.get(`/itinerary/${tripId}`),
 };
 
 // Explore API

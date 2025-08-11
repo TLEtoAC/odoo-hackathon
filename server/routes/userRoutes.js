@@ -70,7 +70,7 @@ const deleteAccountValidation = [
 ];
 
 // Routes
-router.post('/register', registerValidation, validate, userController.register);
+router.post('/register', userController.register);
 router.post('/login', loginValidation, validate, passport.authenticate('local'), userController.login);
 router.post('/logout', auth, userController.logout);
 
