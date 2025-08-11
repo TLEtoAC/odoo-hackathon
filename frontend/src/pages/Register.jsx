@@ -4,16 +4,16 @@ import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
 
 const Register = () => {
-  const [firstName, setFirstName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [firstName, setFirstName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   const handleRegister = async (e) => {
     e.preventDefault();
     try {
-      await axios.post("http://localhost:3000/login", { email, password });
+      await axios.post("http://localhost:3000/register", { firstName, email, password });
 
-      toast.success("Login Successfully", {
+      toast.success("Registered Successfully", {
         position: "top-center",
         autoClose: 3000,
         theme: "colored",
@@ -114,3 +114,32 @@ const Register = () => {
 };
 
 export default Register;
+
+
+
+// import React, { useRef, useEffect } from "react";
+// import { gsap } from "gsap";
+
+// const AnimatedComponent = () => {
+//   const boxRef = useRef(null);
+
+//   useEffect(() => {
+//     gsap.fromTo(
+//       boxRef.current,
+//       { opacity: 0, y: 20 },
+//       { opacity: 1, y: 0, duration: 1, ease: "power3.out" }
+//     );
+//   }, []);
+
+//   return (
+//     <div
+//       ref={boxRef}
+//       className="p-6 max-w-md mx-auto bg-white rounded shadow"
+//     >
+//       <h2 className="text-xl font-bold mb-4">Welcome</h2>
+//       <p>This box fades and slides up on mount.</p>
+//     </div>
+//   );
+// };
+
+// export default AnimatedComponent;

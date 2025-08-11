@@ -5,10 +5,8 @@ import { Link } from "react-router-dom";
 import { toast } from 'react-toastify';
 
 const Login = () => {
-    const [firstName, setFirstName] = useState("");
-    const [lastName , setLastName] = useState("")
-    const [email, setemail] = useState("")
-    const [password, setpassword] = useState("");
+    const [email, setEmail] = useState('')
+    const [password, setPassword] = useState('');
         
     const hangleLogin = async(e) => {
         e.preventDefault();
@@ -63,7 +61,7 @@ const Login = () => {
                   onChange={(e) => {
                     setEmail(e.target.value)
                   }}
-                  className='bg-[#eeeeee] mb-7 rounded-lg px-4 py-2 border w-full text-lg placeholder:text-base'
+                  className='bg-[#eeeeee] mb-7 rounded-lg px-4 py-3 w-full text-lg placeholder:text-base'
                   type="email"
                   placeholder='email@example.com'
                 />
@@ -71,7 +69,7 @@ const Login = () => {
                 <h3 className='text-xl font-bold mb-2'>Enter Password</h3>
     
                 <input
-                  className='bg-[#eeeeee] mb-7 rounded-lg px-4 py-2 border w-full text-lg placeholder:text-base'
+                  className='bg-[#eeeeee] mb-7 rounded-lg px-4 py-3 w-full text-lg placeholder:text-base'
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value)
@@ -79,10 +77,12 @@ const Login = () => {
                   required type="password"
                   placeholder='password'
                 />
-    
+                
+                <Link to="/main">
                 <button
                   className='bg-green-600 text-white font-semibold mb-3 rounded-lg px-4 py-2 w-full text-lg placeholder:text-base'
                 >Login</button>
+                </Link>
 
                 
                 <div className="flex items-center my-4">
@@ -104,7 +104,7 @@ const Login = () => {
                     type="button"
                     className="flex items-center justify-center gap-2 bg-black text-white rounded-lg px-4 py-2 w-full text-lg font-medium hover:bg-gray-800"
                   >
-                    <img src="https://www.svgrepo.com/show/303128/apple-logo.svg" alt="Apple" className="w-5 h-5" />
+                    <img src="https://imgs.search.brave.com/s618w_HRaXhqqMHVyhOw2aDmQLhgjui5w7rAtr2ZKlk/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly9jbGlw/YXJ0LWxpYnJhcnku/Y29tL2ltYWdlc19r/L2FwcGxlLWxvZ28t/dHJhbnNwYXJlbnQt/cG5nL2FwcGxlLWxv/Z28tdHJhbnNwYXJl/bnQtcG5nLTE5Lmpw/Zw" alt="Apple" className="w-5 h-5" />
                     Sign in with Apple
                   </button>
                 </div>
