@@ -17,71 +17,22 @@ const searchCities = async (req, res) => {
     limit = parseInt(limit);
     const offset = (page - 1) * limit;
 
-    // Build WHERE clause
-    const conditions = ['"isActive" = true'];
-    const params = [];
-    let paramIndex = 1;
-
-    if (q) {
-      conditions.push(`(
-        name ILIKE $${paramIndex} OR 
-        country ILIKE $${paramIndex} OR 
-        region ILIKE $${paramIndex}
-      )`);
-      params.push(`%${q}%`);
-      paramIndex++;
-    }
-
-    if (country) {
-      conditions.push(`"countryCode" = $${paramIndex}`);
-      params.push(country);
-      paramIndex++;
-    }
-
-    if (region) {
-      conditions.push(`region = $${paramIndex}`);
-      params.push(region);
-      paramIndex++;
-    }
-
-    // Sorting
-    const allowedSort = [
-      "popularity",
-      "name",
-      "costIndex",
-      "region",
-      "country",
-    ];
-    if (!allowedSort.includes(sortBy)) sortBy = "popularity";
-    sortOrder = sortOrder.toUpperCase() === "ASC" ? "ASC" : "DESC";
-
-    let orderClause = `ORDER BY "${sortBy}" ${sortOrder}`;
-    if (sortBy === "name") {
-      orderClause += `, country ASC`;
-    }
-
-    const whereClause = conditions.length
-      ? `WHERE ${conditions.join(" AND ")}`
-      : "";
-
-    // Count total
-    const countQuery = `SELECT COUNT(*) AS total FROM "Cities" ${whereClause}`;
-    const countResult = await pool.query(countQuery, params);
+    const countQuery = `SELECT COUNT(*) AS total FROM cities WHERE is_active = true`;
+    const countResult = await pool.query(countQuery);
     const totalItems = parseInt(countResult.rows[0].total);
 
-    // Fetch rows
     const cityQuery = `
       SELECT 
-        id, name, country, "countryCode", region,
-        latitude, longitude, "costIndex", popularity,
+        id, name, country, country_code, region,
+        latitude, longitude, cost_index, popularity,
         description, highlights, images, currency
-      FROM "Cities"
-      ${whereClause}
-      ${orderClause}
-      LIMIT ${limit} OFFSET ${offset}
+      FROM cities
+      WHERE is_active = true
+      ORDER BY popularity DESC
+      LIMIT $1 OFFSET $2
     `;
-    const citiesResult = await pool.query(cityQuery, params);
-    const cities = citiesResult.rows; // Replace city.getSummary() logic manually if needed
+    const citiesResult = await pool.query(cityQuery, [limit, offset]);
+    const cities = citiesResult.rows;
 
     res.json({
       success: true,
@@ -107,8 +58,8 @@ const getCityById = async (req, res) => {
     const { cityId } = req.params;
 
     const cityQuery = `
-      SELECT * FROM "Cities"
-      WHERE id = $1 AND "isActive" = true
+      SELECT * FROM cities
+      WHERE id = $1 AND is_active = true
     `;
     const cityResult = await pool.query(cityQuery, [cityId]);
     if (cityResult.rowCount === 0) {
@@ -121,8 +72,8 @@ const getCityById = async (req, res) => {
     const activitiesQuery = `
       SELECT id, name, description, type, category,
              duration, cost, currency, rating, images
-      FROM "Activities"
-      WHERE "cityId" = $1 AND "isActive" = true
+      FROM activities
+      WHERE city_id = $1 AND is_active = true
     `;
     const activitiesResult = await pool.query(activitiesQuery, [cityId]);
 
@@ -144,27 +95,15 @@ const getPopularCities = async (req, res) => {
     let { limit = 10, country } = req.query;
     limit = parseInt(limit);
 
-    const conditions = ['"isActive" = true'];
-    const params = [];
-    let idx = 1;
-
-    if (country) {
-      conditions.push(`"countryCode" = $${idx}`);
-      params.push(country);
-      idx++;
-    }
-
-    const whereClause = `WHERE ${conditions.join(" AND ")}`;
-
     const query = `
-      SELECT id, name, country, "countryCode", region,
-             "costIndex", popularity, images, currency
-      FROM "Cities"
-      ${whereClause}
+      SELECT id, name, country, country_code, region,
+             cost_index, popularity, images, currency
+      FROM cities
+      WHERE is_active = true
       ORDER BY popularity DESC
-      LIMIT ${limit}
+      LIMIT $1
     `;
-    const result = await pool.query(query, params);
+    const result = await pool.query(query, [limit]);
 
     res.json({ success: true, data: { cities: result.rows } });
   } catch (error) {
@@ -184,8 +123,8 @@ const getCitiesByCountry = async (req, res) => {
 
     const countQuery = `
       SELECT COUNT(*) AS total
-      FROM "Cities"
-      WHERE "countryCode" = $1 AND "isActive" = true
+      FROM cities
+      WHERE country_code = $1 AND is_active = true
     `;
     const countResult = await pool.query(countQuery, [
       countryCode.toUpperCase(),
@@ -193,15 +132,17 @@ const getCitiesByCountry = async (req, res) => {
     const totalItems = parseInt(countResult.rows[0].total);
 
     const citiesQuery = `
-      SELECT id, name, country, "countryCode", region,
-             "costIndex", popularity, images, currency
-      FROM "Cities"
-      WHERE "countryCode" = $1 AND "isActive" = true
+      SELECT id, name, country, country_code, region,
+             cost_index, popularity, images, currency
+      FROM cities
+      WHERE country_code = $1 AND is_active = true
       ORDER BY name ASC
-      LIMIT ${limit} OFFSET ${offset}
+      LIMIT $2 OFFSET $3
     `;
     const citiesResult = await pool.query(citiesQuery, [
       countryCode.toUpperCase(),
+      limit,
+      offset
     ]);
 
     res.json({
@@ -226,12 +167,12 @@ const getCitiesByCountry = async (req, res) => {
 const getCountries = async (req, res) => {
   try {
     const query = `
-      SELECT "countryCode" AS code,
+      SELECT country_code AS code,
              country AS name,
-             COUNT(id) AS "cityCount"
-      FROM "Cities"
-      WHERE "isActive" = true
-      GROUP BY "countryCode", country
+             COUNT(id) AS city_count
+      FROM cities
+      WHERE is_active = true
+      GROUP BY country_code, country
       ORDER BY country ASC
     `;
     const result = await pool.query(query);

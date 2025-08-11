@@ -17,7 +17,7 @@ const budgetRoutes = require('./routes/budgetRoutes');
 const integrationsRoutes = require('./routes/integrationsRoutes');
 
 const app = express();
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 4000;
 const USE_MOCKS = (process.env.USE_MOCKS || 'false').toLowerCase() === 'true';
 
 // Security middleware
@@ -68,17 +68,17 @@ app.get('/health', (req, res) => {
 });
 
 // API routes
-if (USE_MOCKS) {
-  const mockRoutes = require('./routes/mockRoutes');
-  app.use('/api', mockRoutes);
-} else {
+// if (USE_MOCKS) {
+//   const mockRoutes = require('./routes/mockRoutes');
+//   app.use('/api', mockRoutes);
+// } else {
   app.use('/api/auth', userRoutes);
   app.use('/api/trips', tripRoutes);
   app.use('/api/explore', exploreRoutes);
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/itinerary', itineraryRoutes);
   app.use('/api/budget', budgetRoutes);
-}
+//}
 app.use('/api/integrations', integrationsRoutes);
 
 // 404 handler

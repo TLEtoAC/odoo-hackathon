@@ -50,6 +50,7 @@ export const integrationsAPI = {
   searchImages: (params) => api.get('/integrations/images/search', { params }),
   geocode: (params) => api.get('/integrations/maps/geocode', { params }),
   searchFlights: (params) => api.get('/integrations/flights/search', { params }),
+  route: (params) => api.get('/integrations/maps/route', { params }),
 };
 
 export default api;

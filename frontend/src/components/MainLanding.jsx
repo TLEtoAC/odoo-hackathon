@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { Link } from "react-router-dom";
 import { dashboardAPI, exploreAPI, integrationsAPI } from '../services/api';
+import RoutePlanner from './RoutePlanner';
 // React Icons
 import { FaPlane, FaUser, FaSearch, FaFilter, FaTh, FaSort, FaSuitcase, FaPlus, FaRoute } from 'react-icons/fa';
 
@@ -220,6 +221,11 @@ const MainLanding = () => {
           </div>
         )}
       </section>
+
+      {/* Quick route planner section */}
+      <div className="px-4 sm:px-8">
+        <RoutePlanner />
+      </div>
 
       <div className="px-4 sm:px-8 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:w-1/2">

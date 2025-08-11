@@ -35,27 +35,29 @@ const getDashboardData = async (req, res) => {
     );
     const upcomingTrips = upcomingTripsRes.rows;
 
-    // Recent trips
+    // Previous/Recent trips (all completed trips)
     const recentTripsRes = await pool.query(
       `
-      SELECT t.*, json_agg(json_build_object(
-        'id', c.id,
-        'name', c.name,
-        'country', c.country,
-        'countryCode', c.country_code
-      )) AS stops
+      SELECT t.id, t.name, t.start_date, t.end_date, t.budget, t.status,
+             COALESCE(json_agg(
+               CASE WHEN c.id IS NOT NULL THEN
+                 json_build_object(
+                   'id', c.id,
+                   'name', c.name,
+                   'country', c.country,
+                   'countryCode', c.country_code
+                 )
+               END
+             ) FILTER (WHERE c.id IS NOT NULL), '[]') AS stops
       FROM trips t
       LEFT JOIN trip_stops ts ON t.id = ts.trip_id
       LEFT JOIN cities c ON ts.city_id = c.id
       WHERE t.user_id = $1
-        AND t.end_date <= $2
-        AND t.end_date >= $3
-        AND t.is_active = true
-      GROUP BY t.id
-      ORDER BY t.end_date DESC
-      LIMIT 5
+      GROUP BY t.id, t.name, t.start_date, t.end_date, t.budget, t.status
+      ORDER BY t.created_at DESC
+      LIMIT 10
       `,
-      [userId, currentDate, start90DaysAgo]
+      [userId]
     );
     const recentTrips = recentTripsRes.rows;
 
@@ -116,7 +118,7 @@ const getDashboardData = async (req, res) => {
       endDate: trip.end_date,
       budget: trip.budget,
       status: trip.status,
-      cities: trip.stops?.filter((s) => s.id !== null) || [],
+      cities: Array.isArray(trip.stops) ? trip.stops.filter((s) => s && s.id !== null) : [],
     });
 
     res.json({
@@ -124,6 +126,7 @@ const getDashboardData = async (req, res) => {
       data: {
         upcomingTrips: upcomingTrips.map(formatTrip),
         recentTrips: recentTrips.map(formatTrip),
+        previousTrips: recentTrips.map(formatTrip),
         popularCities: popularCities.map((c) => ({
           id: c.id,
           name: c.name,

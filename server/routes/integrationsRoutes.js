@@ -64,6 +64,44 @@ router.get('/maps/geocode', async (req, res) => {
   }
 });
 
+// TomTom - Simple point-to-point route polyline (returns array of lat/lng points)
+router.get('/maps/route', async (req, res) => {
+  try {
+    const { startLat, startLng, endLat, endLng, travelMode = 'car' } = req.query;
+    if (
+      startLat == null || startLng == null || endLat == null || endLng == null
+    ) {
+      return res.status(400).json({ success: false, message: 'Missing startLat, startLng, endLat, endLng' });
+    }
+
+    const apiKey = process.env.TOMTOM_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ success: false, message: 'Missing TOMTOM_API_KEY' });
+    }
+
+    // TomTom routing API
+    const start = `${parseFloat(startLat)},${parseFloat(startLng)}`;
+    const end = `${parseFloat(endLat)},${parseFloat(endLng)}`;
+    const url = `https://api.tomtom.com/routing/1/calculateRoute/${encodeURIComponent(start)}:${encodeURIComponent(end)}/json`;
+    const { data } = await axios.get(url, {
+      params: {
+        key: apiKey,
+        travelMode,
+      }
+    });
+
+    const points =
+      data?.routes?.[0]?.legs?.[0]?.points?.map(p => ({ latitude: p.latitude, longitude: p.longitude })) || [];
+
+    if (!points.length) {
+      return res.status(502).json({ success: false, message: 'No route points from provider' });
+    }
+    return res.json({ success: true, data: { points } });
+  } catch (error) {
+    return res.status(error.response?.status || 500).json({ success: false, message: error.response?.data || 'Route fetch failed' });
+  }
+});
+
 // TravelPayouts - Simple flights search proxy
 router.get('/flights/search', async (req, res) => {
   try {
