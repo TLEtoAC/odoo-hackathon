@@ -71,7 +71,7 @@ const updateTripValidation = [
 ];
 
 // Protected routes (require authentication)
-router.post('/', auth, createTripValidation, validate, tripController.createTrip);
+router.post('/', tripController.createTrip);
 router.get('/my-trips', auth, tripController.getUserTrips);
 router.get('/:tripId', auth, tripController.getTripById);
 router.put('/:tripId', auth, updateTripValidation, validate, tripController.updateTrip);
