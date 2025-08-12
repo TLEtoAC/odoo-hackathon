@@ -13,7 +13,7 @@ import AddSection from './components/AddSection'
 import AdminPanel from './components/AdminPanel'
 import ActivitySection from './components/ActivitySection'
 import Budget from './components/Budget'
-import Community from './components/Community'
+import CommunityPage from './components/CommunityPage'
 import UserTrip from './components/UserTripList'
 import AOS from "aos";
 import "aos/dist/aos.css";
@@ -45,7 +45,7 @@ function App() {
           <Route path="/new" element={<ProtectedRoute><CreateNewTrip /></ProtectedRoute>} />
           <Route path="/Calender" element={<ProtectedRoute><CalenderPage /></ProtectedRoute>} />
           <Route path="/Admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
-          <Route path="/Community" element={<ProtectedRoute><Community/></ProtectedRoute>} />
+          <Route path="/Community" element={<ProtectedRoute><CommunityPage/></ProtectedRoute>} />
           <Route path="/Add" element={<ProtectedRoute><AddSection /></ProtectedRoute>} />
           <Route path="/budget" element={<ProtectedRoute><Budget /></ProtectedRoute>} />
           <Route path="/active" element={<ProtectedRoute><ActivitySection /></ProtectedRoute>} />  

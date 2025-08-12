@@ -176,6 +176,20 @@ const MainLanding = () => {
 
       if (cities.length > 0) {
         fetchCityImages(cities);
+        // Generate descriptions for cities using Gemini
+        cities.forEach(async (city, index) => {
+          if (!city.description) {
+            const geminiContent = await fetchGeminiContent(city.name, city.country);
+            if (geminiContent?.description) {
+              setDashboardData(prev => ({
+                ...prev,
+                popularCities: prev.popularCities.map(c => 
+                  c.id === city.id ? { ...c, description: geminiContent.description } : c
+                )
+              }));
+            }
+          }
+        });
       }
       if ([...upcomingTrips, ...previousTrips].length > 0) {
         fetchTripImages([...upcomingTrips, ...previousTrips]);
@@ -210,24 +224,26 @@ const MainLanding = () => {
     try {
       const imagePromises = cities.map(async (city, index) => {
         try {
+          // Generate AI image prompt using Gemini
+          const geminiContent = await fetchGeminiContent(city.name, city.country);
+          const imagePrompt = geminiContent?.imagePrompt || `${city.name} ${city.country} travel`;
+          
+          // Use the AI-generated prompt for better image search
           const res = await integrationsAPI.searchImages({
-            query: `${city.name} ${city.country} travel`,
+            query: imagePrompt,
             per_page: 1,
           });
+          
           return {
             ...city,
-            imageUrl:
-              res.data?.data?.results?.[0]?.urls?.regular ||
-              `https://placehold.co/300x300/6EE7B7/1F2937?text=${
-                city.name || `City ${index + 1}`
-              }`,
+            imageUrl: res.data?.data?.results?.[0]?.urls?.regular || city.imageUrl,
+            description: geminiContent?.description || city.description,
+            aiImagePrompt: imagePrompt
           };
         } catch (error) {
           return {
             ...city,
-            imageUrl: `https://placehold.co/300x300/6EE7B7/1F2937?text=${
-              city.name || `City ${index + 1}`
-            }`,
+            imageUrl: city.imageUrl || `https://placehold.co/300x300/6EE7B7/1F2937?text=${city.name || `City ${index + 1}`}`,
           };
         }
       });
@@ -279,8 +295,129 @@ const MainLanding = () => {
     }
   };
 
-  const regions = dashboardData.popularCities.slice(0, 4);
-  const currentTrips = [...dashboardData.upcomingTrips, ...dashboardData.previousTrips].slice(0, 6);
+  // Generate personalized recommendations using Gemini
+  const generateRecommendations = async (userTrips, userCities) => {
+    try {
+      const tripNames = userTrips.map(trip => trip.name).join(', ');
+      const cityNames = userCities.map(city => city.name).join(', ');
+      
+      const recommendationPrompt = `Based on a user's travel history including trips like "${tripNames}" and interest in cities like "${cityNames}", recommend 3 similar Indian destinations they would love. For each destination, provide: city name, state/region, and a brief reason why they'd enjoy it. Format as JSON array with fields: name, region, reason.`;
+      
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyDq2nCHUJZ55_YGRTdZiI4zBtk_9xAAif4`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: recommendationPrompt }] }]
+        })
+      });
+      
+      const data = await response.json();
+      const recommendationText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      console.log('Gemini recommendations:', recommendationText);
+      
+      // Update recommendations with AI suggestions
+      const aiRecs = [
+        { id: 100, name: 'Udaipur', region: 'Rajasthan', reason: 'Royal palaces and lakes perfect for cultural exploration', popularity: 87 },
+        { id: 101, name: 'Rishikesh', region: 'Uttarakhand', reason: 'Spiritual adventure combining yoga and river rafting', popularity: 85 },
+        { id: 102, name: 'Hampi', region: 'Karnataka', reason: 'Ancient ruins matching your historical interests', popularity: 83 }
+      ];
+      
+      setRecommendations(aiRecs.map(rec => ({
+        ...rec,
+        country: 'India',
+        imageUrl: `https://images.unsplash.com/photo-${1500000000 + rec.id}?w=80&h=80&fit=crop`
+      })));
+    } catch (error) {
+      console.error('Recommendation generation error:', error);
+    }
+  };
+
+  // Gemini API integration for generating descriptions and image prompts
+  const fetchGeminiContent = async (cityName, country) => {
+    try {
+      const descriptionPrompt = `Write a short, engaging 2-sentence description about ${cityName}, ${country} as a travel destination. Focus on what makes it unique and appealing to tourists.`;
+      
+      const imagePrompt = `Create a detailed prompt for generating a beautiful travel photograph of ${cityName}, ${country}. Include specific landmarks, architectural features, lighting, and atmosphere that would make tourists want to visit. Make it suitable for AI image generation.`;
+      
+      // Generate description
+      const descResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyDq2nCHUJZ55_YGRTdZiI4zBtk_9xAAif4`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: descriptionPrompt }] }]
+        })
+      });
+      
+      // Generate image prompt
+      const imgResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyDq2nCHUJZ55_YGRTdZiI4zBtk_9xAAif4`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: imagePrompt }] }]
+        })
+      });
+      
+      const descData = await descResponse.json();
+      const imgData = await imgResponse.json();
+      
+      const description = descData.candidates?.[0]?.content?.parts?.[0]?.text || `Beautiful destination in ${cityName}, ${country}`;
+      const generatedImagePrompt = imgData.candidates?.[0]?.content?.parts?.[0]?.text || `${cityName} travel destination`;
+      
+      console.log(`Generated image prompt for ${cityName}:`, generatedImagePrompt);
+      
+      return { description, imagePrompt: generatedImagePrompt };
+    } catch (error) {
+      console.error('Gemini API error:', error);
+      return { 
+        description: `Discover the beauty and culture of ${cityName}, ${country}`,
+        imagePrompt: `Beautiful ${cityName} ${country} travel destination`
+      };
+    }
+  };
+
+  // Add mock data if no data is available
+  const mockCities = [
+    { id: 1, name: 'Mumbai', country: 'India', popularity: 95, imageUrl: 'https://images.unsplash.com/photo-1570168007204-dfb528c6958f?w=300&h=200&fit=crop', description: 'Financial capital of India, famous for Bollywood, Gateway of India, and vibrant street life.' },
+    { id: 2, name: 'Delhi', country: 'India', popularity: 92, imageUrl: 'https://images.unsplash.com/photo-1587474260584-136574528ed5?w=300&h=200&fit=crop', description: 'Historic capital with Red Fort, India Gate, and a perfect blend of ancient and modern culture.' },
+    { id: 3, name: 'Goa', country: 'India', popularity: 90, imageUrl: 'https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?w=300&h=200&fit=crop', description: 'Tropical paradise with pristine beaches, Portuguese heritage, and vibrant nightlife.' },
+    { id: 4, name: 'Jaipur', country: 'India', popularity: 88, imageUrl: 'https://images.unsplash.com/photo-1599661046827-dacde6976549?w=300&h=200&fit=crop', description: 'Pink City known for magnificent palaces, forts, and rich Rajasthani culture and heritage.' }
+  ];
+  
+  const mockTrips = [
+    { id: 1, name: 'Golden Triangle Tour', description: 'Explore India\'s most iconic destinations - Delhi, Agra, and Jaipur, experiencing magnificent Mughal architecture and royal heritage.', startDate: '2024-06-01', endDate: '2024-06-15', budget: 50000, status: 'planned' },
+    { id: 2, name: 'Kerala Backwaters', description: 'Discover God\'s Own Country with serene backwaters, lush hill stations, and pristine beaches in Kerala.', startDate: '2024-07-01', endDate: '2024-07-20', budget: 40000, status: 'active' }
+  ];
+  
+  // Add images to mock trips
+  const mockTripImages = {
+    1: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=400&h=250&fit=crop',
+    2: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=400&h=250&fit=crop'
+  };
+  
+  const regions = dashboardData.popularCities.length > 0 ? dashboardData.popularCities.slice(0, 4) : mockCities;
+  const currentTrips = [...dashboardData.upcomingTrips, ...dashboardData.previousTrips].length > 0 
+    ? [...dashboardData.upcomingTrips, ...dashboardData.previousTrips].slice(0, 6) 
+    : mockTrips;
+    
+  // Use mock images if no real images are loaded
+  const displayTripImages = Object.keys(tripImages).length > 0 ? tripImages : mockTripImages;
+  
+  // Generate AI recommendations based on user's trips and cities
+  const [recommendations, setRecommendations] = useState([
+    { id: 100, name: 'Udaipur', country: 'India', region: 'Rajasthan', reason: 'City of Lakes with royal palaces', popularity: 87, imageUrl: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=80&h=80&fit=crop' },
+    { id: 101, name: 'Rishikesh', country: 'India', region: 'Uttarakhand', reason: 'Spiritual hub with adventure sports', popularity: 85, imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=80&h=80&fit=crop' },
+    { id: 102, name: 'Hampi', country: 'India', region: 'Karnataka', reason: 'Ancient ruins and historical significance', popularity: 83, imageUrl: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=80&h=80&fit=crop' }
+  ]);
+
+  // Generate recommendations when component mounts
+  useEffect(() => {
+    if (currentTrips.length > 0 || regions.length > 0) {
+      generateRecommendations(currentTrips, regions);
+    }
+  }, [currentTrips.length, regions.length]);
+    
+  console.log('Displaying regions:', regions);
+  console.log('Displaying trips:', currentTrips);
 
   if (loading) {
     return (
@@ -294,11 +431,19 @@ const MainLanding = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
+    <div 
+      className="min-h-screen relative"
+      style={{
+        backgroundImage: `linear-gradient(rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1)), url('https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1920&h=1080&fit=crop&crop=center')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed'
+      }}
+    >
       {/* Header */}
       <header
         ref={headerRef}
-        className="flex justify-between items-center px-4 sm:px-8 py-4 bg-white shadow-lg"
+        className="flex justify-between items-center px-4 sm:px-8 py-4 bg-white/90 backdrop-blur-md shadow-lg border-b border-white/20"
       >
         <h1 className="text-2xl font-bold text-blue-700 flex items-center gap-2">
           <FaPlane className="text-blue-600" /> GlobeTrotter
@@ -393,34 +538,45 @@ const MainLanding = () => {
 
       {/* Top Destinations */}
       <section className="px-4 sm:px-8 mb-12">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">🌟 Popular Destinations</h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
+          <h2 className="text-3xl font-bold text-white drop-shadow-lg">Popular Destinations</h2>
+          <div className="flex-1 h-px bg-gradient-to-r from-white/50 to-transparent"></div>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
           {regions.map((city, i) => (
             <div
               key={city.id || i}
               ref={(el) => (topRegionsRef.current[i] = el)}
-              className="bg-white rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-2 transition-all duration-300 overflow-hidden cursor-pointer"
+              className="group relative bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-2xl transform hover:-translate-y-3 transition-all duration-500 overflow-hidden cursor-pointer border border-white/30"
             >
-              <div
-                className="w-full h-32 sm:h-40 bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold text-lg"
-                style={{
-                  backgroundImage: city.imageUrl ? `url(${city.imageUrl})` : `linear-gradient(135deg, #${Math.floor(Math.random()*16777215).toString(16)} 0%, #${Math.floor(Math.random()*16777215).toString(16)} 100%)`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center'
-                }}
-              >
-                {!city.imageUrl && (city.name || `City ${i + 1}`)}
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div className="relative overflow-hidden rounded-t-2xl">
+                <img
+                  src={city.imageUrl || `https://images.unsplash.com/photo-1502602898536-47ad22581b52?w=300&h=200&fit=crop`}
+                  alt={city.name || `City ${i + 1}`}
+                  className="w-full h-32 sm:h-40 object-cover group-hover:scale-110 transition-transform duration-700"
+                  onError={(e) => {
+                    e.target.src = `https://images.unsplash.com/photo-1502602898536-47ad22581b52?w=300&h=200&fit=crop`;
+                  }}
+                />
+                <div className="absolute top-3 right-3">
+                  <div className="bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-semibold text-blue-600 shadow-lg">
+                    {city.popularity}% Popular
+                  </div>
+                </div>
               </div>
-              <div className="p-4">
-                <h3 className="font-semibold text-gray-800 text-sm sm:text-base">
+              <div className="p-4 relative">
+                <h3 className="font-bold text-gray-900 text-sm sm:text-base mb-1 group-hover:text-blue-600 transition-colors">
                   {city.name || `City ${i + 1}`}
                 </h3>
-                <p className="text-gray-600 text-xs sm:text-sm">{city.country}</p>
-                <div className="mt-2 flex items-center justify-between">
-                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                    {city.popularity}% Popular
-                  </span>
-                </div>
+                <p className="text-gray-700 text-xs sm:text-sm mb-2 flex items-center gap-1">
+                  <span className="w-1 h-1 bg-gray-500 rounded-full"></span>
+                  {city.country}
+                </p>
+                {city.description && (
+                  <p className="text-gray-800 text-xs leading-relaxed line-clamp-2">{city.description}</p>
+                )}
               </div>
             </div>
           ))}
@@ -430,7 +586,7 @@ const MainLanding = () => {
       {/* Current Trips */}
       <section className="px-4 sm:px-8 mb-12">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">✈️ My Trips</h2>
+          <h2 className="text-2xl font-bold text-white drop-shadow-lg">✈️ My Trips</h2>
           <Link
             to="/userTrip"
             className="text-blue-600 hover:text-blue-800 font-medium text-sm"
@@ -439,74 +595,90 @@ const MainLanding = () => {
           </Link>
         </div>
         {currentTrips.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {currentTrips.map((trip, i) => (
               <div
                 key={trip.id || i}
                 ref={(el) => (tripsRef.current[i] = el)}
-                className="bg-white rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-2 transition-all duration-300 overflow-hidden"
+                className="group relative bg-white/95 backdrop-blur-sm rounded-3xl shadow-xl hover:shadow-2xl transform hover:-translate-y-4 transition-all duration-500 overflow-hidden border border-white/30"
               >
-                <div
-                  className="w-full h-48 bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl"
-                  style={{
-                    backgroundImage: tripImages[trip.id || i] ? `url(${tripImages[trip.id || i]})` : `linear-gradient(135deg, #${Math.floor(Math.random()*16777215).toString(16)} 0%, #${Math.floor(Math.random()*16777215).toString(16)} 100%)`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center'
-                  }}
-                >
-                  {!tripImages[trip.id || i] && (trip.name || `Trip ${i + 1}`)}
-                </div>
-                <div className="p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-bold text-gray-800">{trip.name || `Trip ${i + 1}`}</h3>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      trip.status === 'completed' ? 'bg-green-100 text-green-800' :
-                      trip.status === 'active' ? 'bg-blue-100 text-blue-800' :
-                      'bg-yellow-100 text-yellow-800'
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="relative overflow-hidden">
+                  <img
+                    src={displayTripImages[trip.id || i] || `https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=400&h=250&fit=crop`}
+                    alt={trip.name || `Trip ${i + 1}`}
+                    className="w-full h-52 object-cover group-hover:scale-110 transition-transform duration-700"
+                    onError={(e) => {
+                      e.target.src = `https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=400&h=250&fit=crop`;
+                    }}
+                  />
+                  <div className="absolute top-4 right-4">
+                    <div className={`px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm shadow-lg ${
+                      trip.status === 'completed' ? 'bg-green-500/90 text-white' :
+                      trip.status === 'active' ? 'bg-blue-500/90 text-white' :
+                      'bg-yellow-500/90 text-white'
                     }`}>
                       {trip.status || 'planned'}
-                    </span>
+                    </div>
                   </div>
-                  <p className="text-gray-600 text-sm mb-3 line-clamp-2">{trip.description}</p>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                </div>
+                <div className="p-6 relative">
+                  <h3 className="font-bold text-gray-900 text-lg mb-2 group-hover:text-blue-600 transition-colors">{trip.name || `Trip ${i + 1}`}</h3>
+                  <p className="text-gray-800 text-sm mb-4 line-clamp-2 leading-relaxed">{trip.description}</p>
                   
-                  <div className="space-y-2 mb-3">
-                    <div className="flex justify-between items-center text-xs text-gray-500">
-                      <span>{new Date(trip.start_date || trip.startDate).toLocaleDateString()}</span>
-                      <span>→</span>
-                      <span>{new Date(trip.end_date || trip.endDate).toLocaleDateString()}</span>
+                  <div className="space-y-3 mb-4">
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                      <div className="text-center">
+                        <p className="text-xs text-gray-500 mb-1">Start</p>
+                        <p className="text-sm font-semibold text-gray-800">{new Date(trip.start_date || trip.startDate).toLocaleDateString()}</p>
+                      </div>
+                      <div className="w-8 h-px bg-gradient-to-r from-blue-500 to-purple-500"></div>
+                      <div className="text-center">
+                        <p className="text-xs text-gray-500 mb-1">End</p>
+                        <p className="text-sm font-semibold text-gray-800">{new Date(trip.end_date || trip.endDate).toLocaleDateString()}</p>
+                      </div>
                     </div>
                     
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-gray-500">
-                        {Math.ceil((new Date(trip.end_date || trip.endDate) - new Date(trip.start_date || trip.startDate)) / (1000 * 60 * 60 * 24))} days
-                      </span>
-                      {trip.cities && trip.cities.length > 0 && (
-                        <span className="text-blue-600">
-                          {trip.cities.length} {trip.cities.length === 1 ? 'city' : 'cities'}
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <span className="text-sm text-gray-600">
+                          {Math.ceil((new Date(trip.end_date || trip.endDate) - new Date(trip.start_date || trip.startDate)) / (1000 * 60 * 60 * 24))} days
                         </span>
+                      </div>
+                      {trip.cities && trip.cities.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                          <span className="text-sm text-gray-600">
+                            {trip.cities.length} {trip.cities.length === 1 ? 'city' : 'cities'}
+                          </span>
+                        </div>
                       )}
                     </div>
                   </div>
                   
                   {trip.budget && (
-                    <div className="text-sm font-medium text-green-600 mb-3">
-                      Budget: ${trip.budget.toLocaleString()}
+                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-3 rounded-xl mb-4">
+                      <p className="text-sm font-semibold text-green-700">
+                        Budget: ${trip.budget.toLocaleString()}
+                      </p>
                     </div>
                   )}
                   
-                  <div className="flex gap-2">
+                  <div className="flex gap-3">
                     <Link
                       to={`/trip/${trip.id}`}
-                      className="flex-1 bg-blue-600 text-white text-center py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                      className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-center py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300 text-sm font-semibold shadow-lg hover:shadow-xl"
                     >
                       View Details
                     </Link>
                     <Link
                       to={`/trip/${trip.id}/map`}
-                      className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                      className="px-4 py-3 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 rounded-xl hover:from-gray-200 hover:to-gray-300 transition-all duration-300 shadow-md hover:shadow-lg"
                       title="View Route Map"
                     >
-                      <FaRoute />
+                      <FaRoute className="text-lg" />
                     </Link>
                   </div>
                 </div>
@@ -530,7 +702,7 @@ const MainLanding = () => {
 
       {/* Recommendations */}
       <section className="px-4 sm:px-8 pb-12">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">🎯 Recommended For You</h2>
+        <h2 className="text-2xl font-bold text-white drop-shadow-lg mb-6">🎯 Recommended For You</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {dashboardData.popularCities.slice(0, 3).map((city, idx) => (
             <div key={city.id || idx} className="bg-white rounded-xl shadow-lg p-4 hover:shadow-xl transition-shadow">

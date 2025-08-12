@@ -4,9 +4,17 @@ import { FaPlane, FaRoute, FaUsers, FaDollarSign, FaGlobe, FaArrowRight } from '
 
 const Homepage = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div 
+      className="min-h-screen relative"
+      style={{
+        backgroundImage: `linear-gradient(rgba(59, 130, 246, 0.15), rgba(147, 51, 234, 0.15)), url('https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1920&h=1080&fit=crop&crop=center')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed'
+      }}
+    >
       {/* Header */}
-      <header className="flex justify-between items-center px-4 sm:px-8 py-4 bg-white/80 backdrop-blur-sm shadow-sm">
+      <header className="flex justify-between items-center px-4 sm:px-8 py-4 bg-white/90 backdrop-blur-md shadow-lg border-b border-white/20">
         <h1 className="text-2xl font-bold text-blue-700 flex items-center gap-2">
           <FaPlane className="text-blue-600" /> GlobeTrotter
         </h1>
@@ -29,10 +37,10 @@ const Homepage = () => {
       {/* Hero Section */}
       <section className="px-4 sm:px-8 py-16 text-center">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-4xl sm:text-6xl font-bold text-gray-800 mb-6">
+          <h1 className="text-4xl sm:text-6xl font-bold text-gray-900 drop-shadow-lg mb-6">
             Transform Your <span className="text-blue-600">Travel Dreams</span> Into Reality
           </h1>
-          <p className="text-lg sm:text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+          <p className="text-lg sm:text-xl text-gray-800 drop-shadow-sm mb-8 max-w-3xl mx-auto">
             A personalized, intelligent, and collaborative platform that empowers you to dream, design, 
             and organize trips with ease. Make travel planning as exciting as the trip itself.
           </p>
@@ -54,31 +62,31 @@ const Homepage = () => {
       </section>
 
       {/* Features */}
-      <section className="px-4 sm:px-8 py-16 bg-white/50">
+      <section className="px-4 sm:px-8 py-16">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center text-gray-800 mb-12">
+          <h2 className="text-3xl font-bold text-center text-gray-900 drop-shadow-sm mb-12">
             Everything You Need for Perfect Travel Planning
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            <div className="text-center p-6 rounded-xl bg-white shadow-lg hover:shadow-xl transition-shadow">
+            <div className="text-center p-6 rounded-xl bg-white/95 backdrop-blur-sm shadow-lg hover:shadow-xl transition-shadow border border-white/30">
               <FaRoute className="text-4xl text-blue-600 mb-4 mx-auto" />
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">Smart Itineraries</h3>
-              <p className="text-gray-600">Create structured, day-wise travel plans with interactive route visualization</p>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Smart Itineraries</h3>
+              <p className="text-gray-800">Create structured, day-wise travel plans with interactive route visualization</p>
             </div>
-            <div className="text-center p-6 rounded-xl bg-white shadow-lg hover:shadow-xl transition-shadow">
+            <div className="text-center p-6 rounded-xl bg-white/95 backdrop-blur-sm shadow-lg hover:shadow-xl transition-shadow border border-white/30">
               <FaDollarSign className="text-4xl text-green-600 mb-4 mx-auto" />
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">Budget Tracking</h3>
-              <p className="text-gray-600">Make cost-effective decisions with automatic budget breakdowns and analysis</p>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Budget Tracking</h3>
+              <p className="text-gray-800">Make cost-effective decisions with automatic budget breakdowns and analysis</p>
             </div>
-            <div className="text-center p-6 rounded-xl bg-white shadow-lg hover:shadow-xl transition-shadow">
+            <div className="text-center p-6 rounded-xl bg-white/95 backdrop-blur-sm shadow-lg hover:shadow-xl transition-shadow border border-white/30">
               <FaGlobe className="text-4xl text-purple-600 mb-4 mx-auto" />
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">Global Destinations</h3>
-              <p className="text-gray-600">Explore destinations worldwide with detailed city and activity information</p>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Global Destinations</h3>
+              <p className="text-gray-800">Explore destinations worldwide with detailed city and activity information</p>
             </div>
-            <div className="text-center p-6 rounded-xl bg-white shadow-lg hover:shadow-xl transition-shadow">
+            <div className="text-center p-6 rounded-xl bg-white/95 backdrop-blur-sm shadow-lg hover:shadow-xl transition-shadow border border-white/30">
               <FaUsers className="text-4xl text-orange-600 mb-4 mx-auto" />
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">Community Sharing</h3>
-              <p className="text-gray-600">Share your travel plans and get inspired by the community</p>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Community Sharing</h3>
+              <p className="text-gray-800">Share your travel plans and get inspired by the community</p>
             </div>
           </div>
         </div>
@@ -87,8 +95,8 @@ const Homepage = () => {
       {/* Vision Section */}
       <section className="px-4 sm:px-8 py-16">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl font-bold text-gray-800 mb-8">Our Vision</h2>
-          <p className="text-lg text-gray-600 leading-relaxed">
+          <h2 className="text-3xl font-bold text-gray-900 drop-shadow-sm mb-8">Our Vision</h2>
+          <p className="text-lg text-gray-800 drop-shadow-sm leading-relaxed">
             We envision a world where users can explore global destinations, visualize their journeys 
             through structured itineraries, make cost-effective decisions, and share their travel plans 
             within a community. GlobeTrotter combines flexibility and interactivity to offer an 
