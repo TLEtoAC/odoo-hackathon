@@ -476,33 +476,6 @@ const MainLanding = () => {
         </h1>
         
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => setShowNavPopup(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-bold rounded-lg hover:from-yellow-500 hover:to-yellow-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-          >
-            <FaBars className="text-sm" />
-            <span className="hidden sm:inline">Menu</span>
-          </button>
-          
-          <Link
-            to="/Community"
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-          >
-            <FaUsers className="text-sm" />
-            <span className="hidden sm:inline">Community</span>
-          </Link>
-          
-          <button
-            onClick={async () => {
-              await logout();
-              navigate('/');
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-          >
-            <FaSignOutAlt className="text-sm" />
-            <span className="hidden sm:inline">Logout</span>
-          </button>
-          
           <span className="hidden sm:block text-gray-600">Welcome, {user?.firstName || 'User'}!</span>
           
           <div className="relative user-menu">
@@ -510,10 +483,10 @@ const MainLanding = () => {
               onClick={() => setShowUserMenu(!showUserMenu)}
               className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 transition-colors"
             >
-              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+              <div className="w-8 h-8 bg-yellow-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
                 {user?.firstName?.charAt(0) || 'U'}
               </div>
-              <FaUser className="text-blue-600" />
+              <FaUser className="text-yellow-600" />
             </button>
             
             {showUserMenu && (
@@ -529,6 +502,14 @@ const MainLanding = () => {
               </div>
             )}
           </div>
+          
+          <button
+            onClick={() => setShowNavPopup(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-bold rounded-lg hover:from-yellow-500 hover:to-yellow-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+          >
+            <FaBars className="text-sm" />
+            <span className="hidden sm:inline">Menu</span>
+          </button>
         </div>
       </header>
 
@@ -552,14 +533,14 @@ const MainLanding = () => {
               <div className="w-16 h-1 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full"></div>
             </div>
             <h1 className="text-3xl sm:text-5xl font-bold mb-4 leading-tight">
-              Explore the <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">World</span>
+              Explore the <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-500 to-yellow-700">World</span>
             </h1>
             <p className="text-lg sm:text-xl opacity-90 mb-6 max-w-lg">
               Plan your next adventure with GlobeTrotter and discover amazing destinations
             </p>
             <Link
               to="/new"
-              className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-yellow-500 to-yellow-700 text-black px-6 py-3 rounded-xl hover:from-yellow-600 hover:to-yellow-800 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 font-semibold"
             >
               <FaPlus /> Start Planning
             </Link>
@@ -606,34 +587,7 @@ const MainLanding = () => {
         </div>
       </div>
 
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 px-4 sm:px-8 mb-8">
-        <div className="relative w-full sm:w-1/2">
-          <FaSearch className="absolute left-3 top-3 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search trips or destinations..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-        <div className="flex gap-2">
-          <Link
-            to="/quick-start"
-            className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-bold rounded-lg hover:from-yellow-500 hover:to-yellow-700 transition-all duration-300 shadow-lg transform hover:-translate-y-0.5"
-          >
-            ⚡ Quick Start
-          </Link>
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors">
-            <FaTh /> Group by
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors">
-            <FaFilter /> Filter
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors">
-            <FaSort /> Sort
-          </button>
-        </div>
-      </div>
+
 
       {/* Top Destinations */}
       <section className="px-4 sm:px-8 mb-12">

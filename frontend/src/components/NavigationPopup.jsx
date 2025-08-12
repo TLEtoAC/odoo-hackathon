@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { gsap } from 'gsap';
-import { FaBolt, FaMapMarkerAlt, FaSuitcase, FaStar, FaTimes } from 'react-icons/fa';
+import { FaBolt, FaMapMarkerAlt, FaSuitcase, FaStar, FaTimes, FaUsers, FaSignOutAlt } from 'react-icons/fa';
 
 const NavigationPopup = ({ isOpen, onClose }) => {
   const popupRef = useRef(null);
@@ -20,21 +20,28 @@ const NavigationPopup = ({ isOpen, onClose }) => {
       title: 'Popular Destinations',
       description: 'Explore trending places',
       link: '/destinations',
-      gradient: 'from-blue-400 to-blue-600'
+      gradient: 'from-yellow-500 to-yellow-700'
     },
     {
       icon: FaSuitcase,
       title: 'My Trips',
       description: 'View your adventures',
       link: '/userTrip',
-      gradient: 'from-green-400 to-green-600'
+      gradient: 'from-yellow-600 to-yellow-800'
     },
     {
       icon: FaStar,
       title: 'Recommendations',
       description: 'Personalized suggestions',
       link: '/recommendations',
-      gradient: 'from-purple-400 to-purple-600'
+      gradient: 'from-yellow-400 to-yellow-700'
+    },
+    {
+      icon: FaUsers,
+      title: 'Community',
+      description: 'Connect with travelers',
+      link: '/Community',
+      gradient: 'from-yellow-500 to-yellow-600'
     }
   ];
 
@@ -123,8 +130,22 @@ const NavigationPopup = ({ isOpen, onClose }) => {
           ))}
         </div>
 
+        {/* Logout Button */}
+        <div className="p-6 border-t border-gray-200">
+          <button
+            onClick={() => {
+              // Add logout logic here
+              window.location.href = '/';
+            }}
+            className="w-full flex items-center gap-3 p-4 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition-colors"
+          >
+            <FaSignOutAlt className="text-lg" />
+            <span className="font-medium">Logout</span>
+          </button>
+        </div>
+        
         {/* Footer */}
-        <div className="absolute bottom-0 left-0 right-0 p-6 bg-gray-50 border-t">
+        <div className="p-4 bg-gray-50">
           <p className="text-center text-gray-500 text-sm">
             ✨ Discover amazing destinations
           </p>

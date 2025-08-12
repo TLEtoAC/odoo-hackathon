@@ -80,22 +80,22 @@ const StartingPage = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-white via-yellow-50 to-white relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-full blur-3xl animate-spin-slow"></div>
+        <div className="absolute top-20 left-10 w-72 h-72 bg-yellow-400/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-yellow-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-r from-yellow-400/5 to-yellow-600/5 rounded-full blur-3xl animate-spin-slow"></div>
       </div>
 
       {/* Navigation */}
       <nav className="relative z-10 flex justify-between items-center px-6 sm:px-12 py-6">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <FaPlane className="text-3xl text-blue-400 transform rotate-45" />
-            <div className="absolute -inset-2 bg-blue-400/20 rounded-full blur-md"></div>
+            <FaPlane className="text-3xl text-yellow-600 transform rotate-45" />
+            <div className="absolute -inset-2 bg-yellow-400/20 rounded-full blur-md"></div>
           </div>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-yellow-600 to-yellow-800 bg-clip-text text-transparent">
             GlobeTrotter
           </h1>
         </div>
@@ -103,13 +103,13 @@ const StartingPage = () => {
         <div className="flex items-center gap-4">
           <Link
             to="/login"
-            className="px-6 py-2 text-white/80 hover:text-white transition-colors font-medium"
+            className="px-6 py-2 text-gray-700 hover:text-black transition-colors font-medium"
           >
             Login
           </Link>
           <Link
             to="/register"
-            className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-full hover:from-blue-600 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-medium"
+            className="px-6 py-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-black rounded-full hover:from-yellow-500 hover:to-yellow-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-medium"
           >
             Sign Up
           </Link>
@@ -123,16 +123,16 @@ const StartingPage = () => {
           <div ref={heroRef} className="space-y-8">
             <div className="space-y-6">
               <h1 className="text-5xl sm:text-7xl font-bold leading-tight">
-                <span className="bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-gray-800 to-black bg-clip-text text-transparent">
                   Plan Your
                 </span>
                 <br />
-                <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-yellow-500 via-yellow-600 to-yellow-700 bg-clip-text text-transparent">
                   Dream Trip
                 </span>
               </h1>
               
-              <p className="text-xl text-gray-300 leading-relaxed max-w-lg">
+              <p className="text-xl text-gray-700 leading-relaxed max-w-lg">
                 Transform your travel dreams into reality with our AI-powered trip planning platform. 
                 Discover, plan, and share unforgettable adventures.
               </p>
@@ -141,14 +141,14 @@ const StartingPage = () => {
             <div className="flex flex-col sm:flex-row gap-4">
               <Link
                 to="/entry"
-                className="group px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-2xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 shadow-2xl hover:shadow-blue-500/25 transform hover:-translate-y-1 font-semibold text-lg flex items-center justify-center gap-3"
+                className="group px-8 py-4 bg-gradient-to-r from-yellow-400 to-yellow-600 text-black rounded-2xl hover:from-yellow-500 hover:to-yellow-700 transition-all duration-300 shadow-2xl hover:shadow-yellow-500/25 transform hover:-translate-y-1 font-semibold text-lg flex items-center justify-center gap-3"
               >
                 Start Planning
                 <FaArrowRight className="group-hover:translate-x-1 transition-transform" />
               </Link>
               
-              <button className="group px-8 py-4 border border-white/20 text-white rounded-2xl hover:bg-white/10 transition-all duration-300 font-semibold text-lg flex items-center justify-center gap-3">
-                <FaPlay className="text-blue-400" />
+              <button className="group px-8 py-4 border border-gray-300 text-gray-700 rounded-2xl hover:bg-gray-100 transition-all duration-300 font-semibold text-lg flex items-center justify-center gap-3">
+                <FaPlay className="text-yellow-600" />
                 Watch Demo
               </button>
             </div>

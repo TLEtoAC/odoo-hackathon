@@ -149,7 +149,7 @@ const EntryScreen = () => {
       className="min-h-screen relative overflow-hidden cursor-pointer"
       onClick={handleFlightClick}
       style={{
-        background: 'linear-gradient(135deg, #87CEEB 0%, #98D8E8 25%, #B0E0E6 50%, #87CEEB 75%, #ADD8E6 100%)',
+        background: 'linear-gradient(135deg, #FFF8DC 0%, #FFFACD 25%, #F0E68C 50%, #FFD700 75%, #FFA500 100%)',
       }}
     >
       {/* Sun Rays */}
@@ -253,13 +253,14 @@ const EntryScreen = () => {
           ref={titleRef}
           className="text-6xl md:text-8xl font-bold mb-12 drop-shadow-2xl"
           style={{
-            background: 'linear-gradient(45deg, #FFD700 0%, #FFA500 25%, #FF8C00 50%, #FFD700 75%, #FFFF00 100%)',
-            backgroundSize: '300% 300%',
+            background: 'linear-gradient(45deg, #B8860B 0%, #DAA520 25%, #FFD700 50%, #FFA500 75%, #FF8C00 100%)',
+            backgroundSize: '400% 400%',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
-            animation: 'goldShimmer 4s ease-in-out infinite',
-            textShadow: '0 0 30px rgba(255,215,0,0.5)',
+            animation: 'goldShimmer 3s ease-in-out infinite',
+            textShadow: '0 0 40px rgba(255,215,0,0.8), 0 0 80px rgba(255,165,0,0.6)',
+            filter: 'drop-shadow(0 0 20px rgba(255,215,0,0.5))',
           }}
         >
           GlobeTrotter
