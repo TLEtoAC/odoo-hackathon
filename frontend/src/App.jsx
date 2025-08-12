@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { BrowserRouter, Routes , Route } from 'react-router-dom'
+import { AuthProvider } from './context/AuthContext'
+import ProtectedRoute from './components/ProtectedRoute'
+import Homepage from './components/Homepage'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import MainLanding from "./components/MainLanding"
@@ -31,23 +34,26 @@ function App() {
     }, []);
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/main" element={<MainLanding />} />
-        <Route path="/profile" element={<UserProfile />} />
-        <Route path="/new" element={<CreateNewTrip />} />
-        <Route path="/Calender" element={<CalenderPage />} />
-        <Route path="/Admin" element={<AdminPanel />} />
-        <Route path="/Community" element={<Community/>} />
-        <Route path="/Add" element={<AddSection />} />
-        <Route path="/budget" element={<Budget />} />
-        <Route path="/active" element={<ActivitySection />} />  
-        <Route path="/userTrip" element={<UserTrip />} />  
-        <Route path="/trip/:tripId/map" element={<RouteTripMap />} />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Homepage />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/main" element={<ProtectedRoute><MainLanding /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+          <Route path="/new" element={<ProtectedRoute><CreateNewTrip /></ProtectedRoute>} />
+          <Route path="/Calender" element={<ProtectedRoute><CalenderPage /></ProtectedRoute>} />
+          <Route path="/Admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
+          <Route path="/Community" element={<ProtectedRoute><Community/></ProtectedRoute>} />
+          <Route path="/Add" element={<ProtectedRoute><AddSection /></ProtectedRoute>} />
+          <Route path="/budget" element={<ProtectedRoute><Budget /></ProtectedRoute>} />
+          <Route path="/active" element={<ProtectedRoute><ActivitySection /></ProtectedRoute>} />  
+          <Route path="/userTrip" element={<ProtectedRoute><UserTrip /></ProtectedRoute>} />  
+          <Route path="/trip/:tripId/map" element={<ProtectedRoute><RouteTripMap /></ProtectedRoute>} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   )
 }
 

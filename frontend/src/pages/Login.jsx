@@ -6,16 +6,32 @@ import { useAuth } from '../context/AuthContext';
 const Login = () => {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
     const { login } = useAuth();
         
     const handleLogin = async(e) => {
         e.preventDefault();
+        setLoading(true);
         try{
-            await login({email, password});
+            const response = await login({email, password});
+            console.log('Login successful:', response);
             navigate('/main');
         } catch(err) {
             console.error('Login failed:', err);
+            let errorMessage = 'Login failed: ';
+            if (err.code === 'ERR_NETWORK' || err.message.includes('Network Error')) {
+                errorMessage += 'Cannot connect to server. Please ensure the backend is running on http://localhost:4000';
+            } else if (err.response?.status === 401) {
+                errorMessage += 'Invalid email or password. Please check your credentials and try again.';
+            } else if (err.response?.status === 404) {
+                errorMessage += 'User not found. Please check your email or register a new account.';
+            } else {
+                errorMessage += (err.response?.data?.message || err.message);
+            }
+            alert(errorMessage);
+        } finally {
+            setLoading(false);
         }
     }
     return (
@@ -60,8 +76,9 @@ const Login = () => {
                 
                 <button
                   type="submit"
-                  className='bg-green-600 text-white font-semibold mb-3 rounded-lg px-4 py-2 w-full text-lg placeholder:text-base'
-                >Login</button>
+                  disabled={loading}
+                  className='bg-green-600 text-white font-semibold mb-3 rounded-lg px-4 py-2 w-full text-lg placeholder:text-base disabled:opacity-50 disabled:cursor-not-allowed'
+                >{loading ? 'Logging in...' : 'Login'}</button>
 
                 
                 <div className="flex items-center my-4">

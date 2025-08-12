@@ -2,11 +2,41 @@ import axios from 'axios';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:4000') + '/api';
 
+console.log('API Base URL:', API_BASE_URL);
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
+  timeout: 10000,
 });
+
+// Add request interceptor for debugging
+api.interceptors.request.use(
+  (config) => {
+    console.log('Making request to:', config.baseURL + config.url);
+    return config;
+  },
+  (error) => {
+    console.error('Request error:', error);
+    return Promise.reject(error);
+  }
+);
+
+// Add response interceptor for debugging
+api.interceptors.response.use(
+  (response) => {
+    console.log('Response received:', response.status, response.data);
+    return response;
+  },
+  (error) => {
+    console.error('Response error:', error.message);
+    if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
+      console.error('Backend server is not running on', API_BASE_URL);
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Auth API
 export const authAPI = {
@@ -14,6 +44,8 @@ export const authAPI = {
   login: (credentials) => api.post('/auth/login', credentials),
   logout: () => api.post('/auth/logout'),
   getProfile: () => api.get('/auth/profile'),
+  updateProfile: (userData) => api.put('/auth/profile', userData),
+  changePassword: (passwordData) => api.put('/auth/change-password', passwordData),
 };
 
 // Trips API

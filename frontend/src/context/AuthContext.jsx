@@ -46,7 +46,10 @@ export const AuthProvider = ({ children }) => {
   const login = async (credentials) => {
     try {
       const response = await authAPI.login(credentials);
-      setUser(response.data.data.user);
+      console.log('Auth API response:', response.data);
+      const userData = response.data.data?.user || response.data.user;
+      setUser(userData);
+      console.log('User set in context:', userData);
       return response;
     } catch (e) {
       console.error('Backend login failed:', e);
