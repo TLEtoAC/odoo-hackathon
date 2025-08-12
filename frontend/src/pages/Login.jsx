@@ -2,6 +2,7 @@ import React from 'react'
 import {useState} from "react"
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from '../context/AuthContext';
+import { FaPlane, FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
 
 const Login = () => {
     const [email, setEmail] = useState('')
@@ -36,69 +37,80 @@ const Login = () => {
     }
     return (
         <>
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+        <div className="min-h-screen bg-gradient-to-br from-white via-yellow-50 to-white flex items-center justify-center p-4">
+          {/* Background Elements */}
+          <div className="absolute inset-0">
+            <div className="absolute top-20 left-10 w-72 h-72 bg-yellow-400/10 rounded-full blur-3xl animate-pulse"></div>
+            <div className="absolute bottom-20 right-10 w-96 h-96 bg-yellow-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+          </div>
+          
            <form
               onSubmit={handleLogin}
-              className="login-form bg-white p-8 shadow-md w-full max-w-md rounded-2xl"
-              style={{ minHeight: "500px" }}
+              className="relative bg-white/90 backdrop-blur-md p-8 shadow-2xl w-full max-w-md rounded-3xl border-2 border-yellow-200 hover:border-yellow-300 transition-all duration-300"
            >   
-            <h2 className="text-3xl font-bold mb-4 flex justify-center">Login Now</h2>
-            <div className="flex justify-center mb-6">
-              <img
-                  src="https://cdn-icons-png.flaticon.com/512/5087/5087579.png"
-                  alt="Login"
-                  className="w-15 h-15"
-              />
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FaPlane className="text-2xl text-black transform rotate-45" />
+              </div>
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-yellow-500 to-yellow-700 bg-clip-text text-transparent mb-2">Welcome Back</h2>
+              <p className="text-gray-600">Sign in to continue your journey</p>
             </div>
-                <h3 className='text-xl font-bold mb-2'>Email</h3>
-                <input
-                  required
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value)
-                  }}
-                  className='bg-[#eeeeee] mb-7 rounded-lg px-4 py-3 w-full text-lg placeholder:text-base'
-                  type="email"
-                  placeholder='email@example.com'
-                />
-    
-                <h3 className='text-xl font-bold mb-2'>Enter Password</h3>
-    
-                <input
-                  className='bg-[#eeeeee] mb-7 rounded-lg px-4 py-3 w-full text-lg placeholder:text-base'
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value)
-                  }}
-                  required type="password"
-                  placeholder='password'
-                />
+                <div className="space-y-6">
+                  <div>
+                    <label className='text-sm font-semibold text-gray-700 mb-2 block'>Email Address</label>
+                    <div className="relative">
+                      <FaEnvelope className="absolute left-4 top-4 text-gray-400" />
+                      <input
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className='bg-yellow-50 border-2 border-yellow-200 rounded-xl pl-12 pr-4 py-3 w-full text-lg placeholder:text-gray-500 focus:border-yellow-400 focus:outline-none transition-colors'
+                        type="email"
+                        placeholder='Enter your email'
+                      />
+                    </div>
+                  </div>
+        
+                  <div>
+                    <label className='text-sm font-semibold text-gray-700 mb-2 block'>Password</label>
+                    <div className="relative">
+                      <FaLock className="absolute left-4 top-4 text-gray-400" />
+                      <input
+                        className='bg-yellow-50 border-2 border-yellow-200 rounded-xl pl-12 pr-4 py-3 w-full text-lg placeholder:text-gray-500 focus:border-yellow-400 focus:outline-none transition-colors'
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required type="password"
+                        placeholder='Enter your password'
+                      />
+                    </div>
+                  </div>
+                </div>
                 
                 <button
                   type="submit"
                   disabled={loading}
-                  className='bg-green-600 text-white font-semibold mb-3 rounded-lg px-4 py-2 w-full text-lg placeholder:text-base disabled:opacity-50 disabled:cursor-not-allowed'
-                >{loading ? 'Logging in...' : 'Login'}</button>
+                  className='bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-bold rounded-xl px-4 py-3 w-full text-lg hover:from-yellow-500 hover:to-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 mt-6'
+                >{loading ? 'Signing in...' : 'Sign In'}</button>
 
                 
-                <div className="flex items-center my-4">
-                  <div className="flex-grow h-px bg-gray-300"></div>
-                  <span className="mx-3 text-gray-500 font-medium">or</span>
-                  <div className="flex-grow h-px bg-gray-300"></div>
+                <div className="flex items-center my-6">
+                  <div className="flex-grow h-px bg-yellow-200"></div>
+                  <span className="mx-4 text-gray-500 font-medium bg-white px-2">or continue with</span>
+                  <div className="flex-grow h-px bg-yellow-200"></div>
                 </div>
 
                 
-                <div className="flex flex-col gap-3 mb-3">
+                <div className="flex flex-col gap-3 mb-6">
                   <button
                     type="button"
-                    className="flex items-center justify-center gap-2 bg-white border border-gray-300 rounded-lg px-4 py-2 w-full text-lg font-medium hover:bg-gray-50"
+                    className="flex items-center justify-center gap-3 bg-white border-2 border-yellow-200 rounded-xl px-4 py-3 w-full text-lg font-medium hover:border-yellow-300 hover:bg-yellow-50 transition-all duration-300"
                   >
                     <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" />
                     Sign in with Google
                   </button>
                   <button
                     type="button"
-                    className="flex items-center justify-center gap-2 bg-black text-white rounded-lg px-4 py-2 w-full text-lg font-medium hover:bg-gray-800"
+                    className="flex items-center justify-center gap-3 bg-black text-white rounded-xl px-4 py-3 w-full text-lg font-medium hover:bg-gray-800 transition-all duration-300"
                   >
                     <img src="https://imgs.search.brave.com/s618w_HRaXhqqMHVyhOw2aDmQLhgjui5w7rAtr2ZKlk/rs:fit:500:0:1:0/g:ce/aHR0cHM6Ly9jbGlw/YXJ0LWxpYnJhcnku/Y29tL2ltYWdlc19r/L2FwcGxlLWxvZ28t/dHJhbnNwYXJlbnQt/cG5nL2FwcGxlLWxv/Z28tdHJhbnNwYXJl/bnQtcG5nLTE5Lmpw/Zw" alt="Apple" className="w-5 h-5" />
                     Sign in with Apple
@@ -106,11 +118,12 @@ const Login = () => {
                 </div>
    
                
-              <p className='text-center'>Do'not have a account? <Link to='/register' className='text-blue-600'>Register here</Link></p>
-            <div>
-              <p className='text-[10px] leading-tight'>This site is protected by reCAPTCHA and the <span className='underline'>Google Privacy
-                Policy</span> and <span className='underline'>Terms of Service apply</span>.</p>
-            </div>
+              <div className="text-center">
+                <p className='text-gray-600'>Don't have an account? <Link to='/register' className='text-yellow-600 hover:text-yellow-700 font-semibold'>Create Account</Link></p>
+              </div>
+              <div className="mt-4">
+                <p className='text-xs text-gray-500 text-center leading-relaxed'>This site is protected by reCAPTCHA and the <span className='underline'>Google Privacy Policy</span> and <span className='underline'>Terms of Service</span> apply.</p>
+              </div>
             </form>
         </div>
      

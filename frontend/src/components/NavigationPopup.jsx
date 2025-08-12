@@ -89,7 +89,7 @@ const NavigationPopup = ({ isOpen, onClose }) => {
       {/* Popup */}
       <div
         ref={popupRef}
-        className="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-[9999] border-l-4 border-yellow-400"
+        className="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-[9999] border-l-4 border-yellow-400 overflow-y-auto"
       >
         {/* Header */}
         <div className="bg-gradient-to-r from-yellow-400 to-yellow-600 p-6 text-black">

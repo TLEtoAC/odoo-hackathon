@@ -9,6 +9,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import MainLanding from "./components/MainLanding"
 import QuickStart from './components/QuickStart'
+import RecommendationsPage from './components/RecommendationsPage'
 import UserProfile from './pages/UserProfile'
 import CreateNewTrip from './components/CreateNewTrip'
 import CalenderPage from './components/Calender'
@@ -50,11 +51,12 @@ function App() {
           <Route path="/dashboard" element={<ProtectedRoute><MainLanding /></ProtectedRoute>} />
           <Route path="/main" element={<ProtectedRoute><MainLanding /></ProtectedRoute>} />
           <Route path="/quick-start" element={<QuickStart />} />
+          <Route path="/recommendations" element={<RecommendationsPage />} />
           <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
           <Route path="/new" element={<ProtectedRoute><CreateNewTrip /></ProtectedRoute>} />
           <Route path="/Calender" element={<ProtectedRoute><CalenderPage /></ProtectedRoute>} />
           <Route path="/Admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
-          <Route path="/Community" element={<ProtectedRoute><CommunityPage/></ProtectedRoute>} />
+          <Route path="/Community" element={<CommunityPage/>} />
           <Route path="/itinerary/:tripId" element={<ProtectedRoute><ItineraryBuilder/></ProtectedRoute>} />
           <Route path="/budget/:tripId" element={<ProtectedRoute><BudgetManager/></ProtectedRoute>} />
           <Route path="/Add" element={<ProtectedRoute><AddSection /></ProtectedRoute>} />
