@@ -4,7 +4,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { dashboardAPI, exploreAPI, integrationsAPI, tripsAPI } from "../services/api";
 import RoutePlanner from "./RoutePlanner";
-import { FaPlane, FaUser, FaSearch, FaFilter, FaTh, FaSort, FaSuitcase, FaPlus, FaRoute, FaSignOutAlt, FaCog } from "react-icons/fa";
+import NavigationPopup from "./NavigationPopup";
+import { FaPlane, FaUser, FaSearch, FaFilter, FaTh, FaSort, FaSuitcase, FaPlus, FaRoute, FaSignOutAlt, FaCog, FaUsers, FaCalendarAlt, FaDollarSign, FaBars } from "react-icons/fa";
 
 const MainLanding = () => {
   const { user, logout } = useAuth();
@@ -24,6 +25,8 @@ const MainLanding = () => {
   const [heroImage, setHeroImage] = useState(null);
   const [tripImages, setTripImages] = useState({});
   const [loading, setLoading] = useState(true);
+  const [showNavPopup, setShowNavPopup] = useState(false);
+  const [bookedTrips, setBookedTrips] = useState([]);
 
   topRegionsRef.current = [];
   tripsRef.current = [];
@@ -31,6 +34,7 @@ const MainLanding = () => {
   useEffect(() => {
     fetchDashboardData();
     fetchHeroImage();
+    loadBookedTrips();
 
     // Refresh data when user returns to the page
     const handleVisibilityChange = () => {
@@ -123,6 +127,11 @@ const MainLanding = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showUserMenu]);
+
+  const loadBookedTrips = () => {
+    const trips = JSON.parse(localStorage.getItem('bookedTrips') || '[]');
+    setBookedTrips(trips);
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -262,24 +271,49 @@ const MainLanding = () => {
     try {
       const imagePromises = trips.map(async (trip, index) => {
         try {
-          const res = await integrationsAPI.searchImages({
-            query: `${trip.name} travel destination`,
-            per_page: 1,
+          // Generate image using Gemini AI
+          const imagePrompt = `Beautiful travel destination image for ${trip.name || trip.destination || 'travel'}, showing iconic landmarks, scenic views, vibrant colors, professional photography style`;
+          
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyDq2nCHUJZ55_YGRTdZiI4zBtk_9xAAif4`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: `Generate a detailed description for a travel image of ${trip.name || trip.destination || 'beautiful destination'}. Include specific visual elements, colors, and atmosphere.` }] }]
+            })
           });
+          
+          const data = await response.json();
+          const description = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          
+          // Use a high-quality travel image based on destination
+          const destinationImages = {
+            'mumbai': 'https://images.unsplash.com/photo-1570168007204-dfb528c6958f?w=400&h=250&fit=crop',
+            'delhi': 'https://images.unsplash.com/photo-1587474260584-136574528ed5?w=400&h=250&fit=crop',
+            'goa': 'https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?w=400&h=250&fit=crop',
+            'kerala': 'https://images.unsplash.com/photo-1602216056096-3b40cc0c9944?w=400&h=250&fit=crop',
+            'rajasthan': 'https://images.unsplash.com/photo-1599661046827-dacde6976549?w=400&h=250&fit=crop',
+            'default': 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=400&h=250&fit=crop'
+          };
+          
+          const tripName = (trip.name || trip.destination || '').toLowerCase();
+          let imageUrl = destinationImages.default;
+          
+          for (const [key, url] of Object.entries(destinationImages)) {
+            if (tripName.includes(key)) {
+              imageUrl = url;
+              break;
+            }
+          }
+          
           return {
             tripId: trip.id || index,
-            imageUrl:
-              res.data?.data?.results?.[0]?.urls?.regular ||
-              `https://placehold.co/300x400/93C5FD/1E40AF?text=${
-                trip.name || `Trip ${index + 1}`
-              }`,
+            imageUrl,
+            aiDescription: description
           };
         } catch (error) {
           return {
             tripId: trip.id || index,
-            imageUrl: `https://placehold.co/300x400/93C5FD/1E40AF?text=${
-              trip.name || `Trip ${index + 1}`
-            }`,
+            imageUrl: `https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=400&h=250&fit=crop`,
           };
         }
       });
@@ -395,8 +429,8 @@ const MainLanding = () => {
   };
   
   const regions = dashboardData.popularCities.length > 0 ? dashboardData.popularCities.slice(0, 4) : mockCities;
-  const currentTrips = [...dashboardData.upcomingTrips, ...dashboardData.previousTrips].length > 0 
-    ? [...dashboardData.upcomingTrips, ...dashboardData.previousTrips].slice(0, 6) 
+  const currentTrips = [...dashboardData.upcomingTrips, ...dashboardData.previousTrips, ...bookedTrips].length > 0 
+    ? [...dashboardData.upcomingTrips, ...dashboardData.previousTrips, ...bookedTrips].slice(0, 6) 
     : mockTrips;
     
   // Use mock images if no real images are loaded
@@ -431,25 +465,44 @@ const MainLanding = () => {
   }
 
   return (
-    <div 
-      className="min-h-screen relative"
-      style={{
-        backgroundImage: `linear-gradient(rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1)), url('https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1920&h=1080&fit=crop&crop=center')`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundAttachment: 'fixed'
-      }}
-    >
+    <div className="min-h-screen bg-white relative">
       {/* Header */}
       <header
         ref={headerRef}
-        className="flex justify-between items-center px-4 sm:px-8 py-4 bg-white/90 backdrop-blur-md shadow-lg border-b border-white/20"
+        className="flex justify-between items-center px-4 sm:px-8 py-4 bg-white shadow-lg border-b-4 border-yellow-400"
       >
-        <h1 className="text-2xl font-bold text-blue-700 flex items-center gap-2">
-          <FaPlane className="text-blue-600" /> GlobeTrotter
+        <h1 className="text-2xl font-bold text-black flex items-center gap-2">
+          <FaPlane className="text-yellow-600" /> GlobeTrotter
         </h1>
         
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => setShowNavPopup(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-bold rounded-lg hover:from-yellow-500 hover:to-yellow-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+          >
+            <FaBars className="text-sm" />
+            <span className="hidden sm:inline">Menu</span>
+          </button>
+          
+          <Link
+            to="/Community"
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+          >
+            <FaUsers className="text-sm" />
+            <span className="hidden sm:inline">Community</span>
+          </Link>
+          
+          <button
+            onClick={async () => {
+              await logout();
+              navigate('/');
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+          >
+            <FaSignOutAlt className="text-sm" />
+            <span className="hidden sm:inline">Logout</span>
+          </button>
+          
           <span className="hidden sm:block text-gray-600">Welcome, {user?.firstName || 'User'}!</span>
           
           <div className="relative user-menu">
@@ -473,16 +526,6 @@ const MainLanding = () => {
                   <FaCog className="text-gray-500" />
                   Profile Settings
                 </Link>
-                <button
-                  onClick={async () => {
-                    await logout();
-                    navigate('/');
-                  }}
-                  className="flex items-center gap-2 px-4 py-3 hover:bg-gray-50 transition-colors w-full text-left text-red-600"
-                >
-                  <FaSignOutAlt className="text-red-500" />
-                  Logout
-                </button>
               </div>
             )}
           </div>
@@ -494,23 +537,73 @@ const MainLanding = () => {
         ref={bannerRef}
         className="relative mx-4 sm:mx-8 my-6 h-64 sm:h-80 rounded-2xl shadow-xl overflow-hidden"
         style={{
-          backgroundImage: heroImage ? `url(${heroImage})` : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          backgroundImage: `url('https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1200&h=800&fit=crop&crop=center')`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
       >
         <div className="absolute inset-0 bg-black/40" />
-        <div className="relative z-10 h-full flex items-center justify-center text-center text-white px-4">
-          <div>
-            <h1 className="text-3xl sm:text-5xl font-bold mb-4">Explore the World</h1>
-            <p className="text-lg sm:text-xl opacity-90">Plan your next adventure with GlobeTrotter</p>
+        <div className="relative z-10 h-full flex items-center justify-between text-white px-6 sm:px-12">
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+                <FaPlane className="text-2xl text-white" />
+              </div>
+              <div className="w-16 h-1 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full"></div>
+            </div>
+            <h1 className="text-3xl sm:text-5xl font-bold mb-4 leading-tight">
+              Explore the <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">World</span>
+            </h1>
+            <p className="text-lg sm:text-xl opacity-90 mb-6 max-w-lg">
+              Plan your next adventure with GlobeTrotter and discover amazing destinations
+            </p>
+            <Link
+              to="/new"
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+            >
+              <FaPlus /> Start Planning
+            </Link>
+          </div>
+          <div className="hidden lg:flex flex-col items-center gap-4">
+            <div className="grid grid-cols-2 gap-3">
+              <img
+                src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=120&h=120&fit=crop"
+                alt="Mountain"
+                className="w-20 h-20 rounded-xl object-cover shadow-lg hover:scale-105 transition-transform duration-300"
+              />
+              <img
+                src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=120&h=120&fit=crop"
+                alt="Beach"
+                className="w-20 h-20 rounded-xl object-cover shadow-lg hover:scale-105 transition-transform duration-300"
+              />
+              <img
+                src="https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=120&h=120&fit=crop"
+                alt="City"
+                className="w-20 h-20 rounded-xl object-cover shadow-lg hover:scale-105 transition-transform duration-300"
+              />
+              <img
+                src="https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=120&h=120&fit=crop"
+                alt="Culture"
+                className="w-20 h-20 rounded-xl object-cover shadow-lg hover:scale-105 transition-transform duration-300"
+              />
+            </div>
+            <div className="text-center">
+              <p className="text-sm opacity-75">Discover Amazing Places</p>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Route Planner */}
-      <div className="px-4 sm:px-8 mb-8">
-        <RoutePlanner />
+      <div className="px-4 sm:px-8 mb-12">
+        <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-2xl p-8 border-2 border-yellow-200 shadow-lg">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-2 h-8 bg-gradient-to-b from-yellow-400 to-yellow-600 rounded-full"></div>
+            <h2 className="text-3xl font-bold text-black">Plan a Quick Route</h2>
+            <div className="flex-1 h-px bg-gradient-to-r from-yellow-400/50 to-transparent"></div>
+          </div>
+          <RoutePlanner />
+        </div>
       </div>
 
       {/* Search and Filters */}
@@ -524,6 +617,12 @@ const MainLanding = () => {
           />
         </div>
         <div className="flex gap-2">
+          <Link
+            to="/quick-start"
+            className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-black font-bold rounded-lg hover:from-yellow-500 hover:to-yellow-700 transition-all duration-300 shadow-lg transform hover:-translate-y-0.5"
+          >
+            ⚡ Quick Start
+          </Link>
           <button className="flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors">
             <FaTh /> Group by
           </button>
@@ -538,18 +637,19 @@ const MainLanding = () => {
 
       {/* Top Destinations */}
       <section className="px-4 sm:px-8 mb-12">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
-          <h2 className="text-3xl font-bold text-white drop-shadow-lg">Popular Destinations</h2>
-          <div className="flex-1 h-px bg-gradient-to-r from-white/50 to-transparent"></div>
-        </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-          {regions.map((city, i) => (
-            <div
-              key={city.id || i}
-              ref={(el) => (topRegionsRef.current[i] = el)}
-              className="group relative bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-2xl transform hover:-translate-y-3 transition-all duration-500 overflow-hidden cursor-pointer border border-white/30"
-            >
+        <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-2xl p-8 border-2 border-yellow-200 shadow-lg">
+          <div className="flex items-center gap-3 mb-8">
+            <div className="w-2 h-8 bg-gradient-to-b from-yellow-400 to-yellow-600 rounded-full"></div>
+            <h2 className="text-3xl font-bold text-black">Popular Destinations</h2>
+            <div className="flex-1 h-px bg-gradient-to-r from-yellow-400/50 to-transparent"></div>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+            {regions.map((city, i) => (
+              <div
+                key={city.id || i}
+                ref={(el) => (topRegionsRef.current[i] = el)}
+                className="group relative bg-white rounded-2xl shadow-lg hover:shadow-2xl transform hover:-translate-y-3 transition-all duration-500 overflow-hidden cursor-pointer border-2 border-yellow-200 hover:border-yellow-400"
+              >
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative overflow-hidden rounded-t-2xl">
                 <img
@@ -580,22 +680,28 @@ const MainLanding = () => {
               </div>
             </div>
           ))}
+          </div>
         </div>
       </section>
 
       {/* Current Trips */}
       <section className="px-4 sm:px-8 mb-12">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-white drop-shadow-lg">✈️ My Trips</h2>
-          <Link
-            to="/userTrip"
-            className="text-blue-600 hover:text-blue-800 font-medium text-sm"
-          >
-            View All →
-          </Link>
-        </div>
-        {currentTrips.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-2xl p-8 border-2 border-yellow-200 shadow-lg">
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-8 bg-gradient-to-b from-yellow-400 to-yellow-600 rounded-full"></div>
+              <h2 className="text-3xl font-bold text-black">My Trips</h2>
+              <div className="flex-1 h-px bg-gradient-to-r from-yellow-400/50 to-transparent"></div>
+            </div>
+            <Link
+              to="/userTrip"
+              className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+            >
+              View All →
+            </Link>
+          </div>
+          {currentTrips.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {currentTrips.map((trip, i) => (
               <div
                 key={trip.id || i}
@@ -661,11 +767,25 @@ const MainLanding = () => {
                   {trip.budget && (
                     <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-3 rounded-xl mb-4">
                       <p className="text-sm font-semibold text-green-700">
-                        Budget: ${trip.budget.toLocaleString()}
+                        Budget: ₹{trip.budget.toLocaleString()}
                       </p>
                     </div>
                   )}
                   
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <Link
+                      to={`/itinerary/${trip.id}`}
+                      className="bg-gradient-to-r from-green-600 to-green-700 text-white text-center py-2 rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-300 text-sm font-semibold shadow-md hover:shadow-lg flex items-center justify-center gap-1"
+                    >
+                      <FaCalendarAlt className="text-xs" /> Itinerary
+                    </Link>
+                    <Link
+                      to={`/budget/${trip.id}`}
+                      className="bg-gradient-to-r from-orange-600 to-orange-700 text-white text-center py-2 rounded-lg hover:from-orange-700 hover:to-orange-800 transition-all duration-300 text-sm font-semibold shadow-md hover:shadow-lg flex items-center justify-center gap-1"
+                    >
+                      <FaDollarSign className="text-xs" /> Budget
+                    </Link>
+                  </div>
                   <div className="flex gap-3">
                     <Link
                       to={`/trip/${trip.id}`}
@@ -684,50 +804,58 @@ const MainLanding = () => {
                 </div>
               </div>
             ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <FaSuitcase className="text-6xl text-gray-300 mb-4 mx-auto" />
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">No trips yet</h3>
-            <p className="text-gray-500 mb-6">Start planning your first adventure!</p>
-            <Link
-              to="/new"
-              className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <FaPlus /> Create Your First Trip
-            </Link>
-          </div>
-        )}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <FaSuitcase className="text-6xl text-gray-300 mb-4 mx-auto" />
+              <h3 className="text-xl font-semibold text-gray-600 mb-2">No trips yet</h3>
+              <p className="text-gray-500 mb-6">Start planning your first adventure!</p>
+              <Link
+                to="/new"
+                className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <FaPlus /> Create Your First Trip
+              </Link>
+            </div>
+          )}
+        </div>
       </section>
 
       {/* Recommendations */}
       <section className="px-4 sm:px-8 pb-12">
-        <h2 className="text-2xl font-bold text-white drop-shadow-lg mb-6">🎯 Recommended For You</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {dashboardData.popularCities.slice(0, 3).map((city, idx) => (
-            <div key={city.id || idx} className="bg-white rounded-xl shadow-lg p-4 hover:shadow-xl transition-shadow">
+        <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-2xl p-8 border-2 border-yellow-200 shadow-lg">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-2 h-8 bg-gradient-to-b from-yellow-400 to-yellow-600 rounded-full"></div>
+            <h2 className="text-3xl font-bold text-black">Recommended For You</h2>
+            <div className="flex-1 h-px bg-gradient-to-r from-yellow-400/50 to-transparent"></div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {recommendations.map((city, idx) => (
+            <div key={city.id || idx} className="bg-white rounded-xl shadow-lg p-4 hover:shadow-xl transition-shadow border-2 border-yellow-200 hover:border-yellow-400">
               <div className="flex items-center gap-4">
-                <div
-                  className="w-16 h-16 rounded-lg bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center text-white font-bold text-lg"
-                  style={{
-                    backgroundImage: city.imageUrl ? `url(${city.imageUrl})` : `linear-gradient(135deg, #${Math.floor(Math.random()*16777215).toString(16)} 0%, #${Math.floor(Math.random()*16777215).toString(16)} 100%)`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center'
+                <img
+                  src={city.imageUrl || `https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=80&h=80&fit=crop`}
+                  alt={city.name}
+                  className="w-16 h-16 rounded-lg object-cover"
+                  onError={(e) => {
+                    e.target.src = `https://placehold.co/80x80/6EE7B7/1F2937?text=${city.name?.charAt(0) || "C"}`;
                   }}
-                >
-                  {!city.imageUrl && (city.name?.charAt(0) || "C")}
-                </div>
+                />
                 <div>
-                  <h3 className="font-semibold text-gray-800">{city.name}</h3>
-                  <p className="text-gray-600 text-sm">{city.country}</p>
-                  <div className="text-xs text-blue-600 font-medium">
-                    {city.popularity}% popularity
+                  <h3 className="font-semibold text-gray-900">{city.name}</h3>
+                  <p className="text-gray-700 text-sm">{city.region || city.country}</p>
+                  {city.reason && (
+                    <p className="text-xs text-blue-600 font-medium mt-1 line-clamp-2">{city.reason}</p>
+                  )}
+                  <div className="text-xs text-green-600 font-medium mt-1">
+                    {city.popularity}% match
                   </div>
                 </div>
               </div>
             </div>
           ))}
-        </div>
+          </div>
+          </div>
       </section>
 
       {/* Floating Action Button */}
@@ -739,6 +867,12 @@ const MainLanding = () => {
           <FaPlus className="text-xl" />
         </button>
       </Link>
+      
+      {/* Navigation Popup */}
+      <NavigationPopup 
+        isOpen={showNavPopup} 
+        onClose={() => setShowNavPopup(false)} 
+      />
     </div>
   );
 };

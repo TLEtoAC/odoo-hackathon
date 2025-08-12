@@ -16,7 +16,7 @@ const Login = () => {
         try{
             const response = await login({email, password});
             console.log('Login successful:', response);
-            navigate('/main');
+            navigate('/dashboard');
         } catch(err) {
             console.error('Login failed:', err);
             let errorMessage = 'Login failed: ';

@@ -2,10 +2,13 @@ import { useState } from 'react'
 import { BrowserRouter, Routes , Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import StartingPage from './components/StartingPage'
+import EntryScreen from './components/EntryScreen'
 import Homepage from './components/Homepage'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import MainLanding from "./components/MainLanding"
+import QuickStart from './components/QuickStart'
 import UserProfile from './pages/UserProfile'
 import CreateNewTrip from './components/CreateNewTrip'
 import CalenderPage from './components/Calender'
@@ -14,6 +17,8 @@ import AdminPanel from './components/AdminPanel'
 import ActivitySection from './components/ActivitySection'
 import Budget from './components/Budget'
 import CommunityPage from './components/CommunityPage'
+import ItineraryBuilder from './components/ItineraryBuilder'
+import BudgetManager from './components/BudgetManager'
 import UserTrip from './components/UserTripList'
 import AOS from "aos";
 import "aos/dist/aos.css";
@@ -37,15 +42,21 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Homepage />} />
+          <Route path="/" element={<StartingPage />} />
+          <Route path="/entry" element={<EntryScreen />} />
+          <Route path="/home" element={<Homepage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/dashboard" element={<ProtectedRoute><MainLanding /></ProtectedRoute>} />
           <Route path="/main" element={<ProtectedRoute><MainLanding /></ProtectedRoute>} />
+          <Route path="/quick-start" element={<QuickStart />} />
           <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
           <Route path="/new" element={<ProtectedRoute><CreateNewTrip /></ProtectedRoute>} />
           <Route path="/Calender" element={<ProtectedRoute><CalenderPage /></ProtectedRoute>} />
           <Route path="/Admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
           <Route path="/Community" element={<ProtectedRoute><CommunityPage/></ProtectedRoute>} />
+          <Route path="/itinerary/:tripId" element={<ProtectedRoute><ItineraryBuilder/></ProtectedRoute>} />
+          <Route path="/budget/:tripId" element={<ProtectedRoute><BudgetManager/></ProtectedRoute>} />
           <Route path="/Add" element={<ProtectedRoute><AddSection /></ProtectedRoute>} />
           <Route path="/budget" element={<ProtectedRoute><Budget /></ProtectedRoute>} />
           <Route path="/active" element={<ProtectedRoute><ActivitySection /></ProtectedRoute>} />  
