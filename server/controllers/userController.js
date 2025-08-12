@@ -43,6 +43,7 @@ const register = async (req, res) => {
 
 // Login via Passport local already handles compare; but keep API fallback
 const login = async (req, res) => {
+  console.log("login attempteed===================")
   try {
     const { email, password } = req.body;
     const found = await pool.query('SELECT * FROM users WHERE email=$1 LIMIT 1', [email]);
