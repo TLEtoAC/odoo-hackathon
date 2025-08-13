@@ -2,6 +2,10 @@
 
 A comprehensive travel planning application with AI-powered recommendations, community features, and intelligent itinerary building.
 
+
+##Video-
+https://drive.google.com/file/d/1gMwVLIhAlKWEXL6oRctiEc1m8REikHcI/view?usp=drivesdk
+
 ## ✨ Features
 
 - **Entry Screen**: Beautiful cloud animation with golden GlobeTrotter branding
@@ -91,17 +95,3 @@ A comprehensive travel planning application with AI-powered recommendations, com
 - **Unsplash**: Travel destination images
 - **TomTom**: Maps and routing services
 
-## 🚀 Deployment
-
-1. Set production environment variables
-2. Build frontend: `npm run build`
-3. Deploy backend with PM2 or similar
-4. Configure reverse proxy (Nginx)
-
-## 📄 License
-
-MIT License - Built for hackathon challenge
-
----
-
-**GlobeTrotter** - Making travel planning as exciting as the trip itself! ✈️🌍
